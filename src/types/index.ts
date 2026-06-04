@@ -8,6 +8,7 @@ export interface MapRadiusProps {
   zoom?: number
   minRadius?: number
   maxRadius?: number
+  radiusStep?: number
   mode?: Mode
   height?: string
   locale?: string

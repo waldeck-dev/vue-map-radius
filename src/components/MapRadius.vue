@@ -18,6 +18,7 @@ const props = withDefaults(defineProps<{
   zoom?: number
   minRadius?: number
   maxRadius?: number
+  radiusStep?: number
   mode?: Mode
   height?: string
   locale?: string
@@ -27,11 +28,18 @@ const props = withDefaults(defineProps<{
   zoom: 2,
   minRadius: 0,
   maxRadius: Infinity,
+  radiusStep: 1,
   mode: 'radius' as Mode,
   height: '500px',
   locale: 'en',
   translations: () => ({}),
 })
+
+watch(() => props.radiusStep, (val) => {
+  if (val < 0) {
+    console.warn('[vue-map-radius] radiusStep must be >= 0, got ' + val)
+  }
+}, { immediate: true })
 
 const emit = defineEmits<{
   (e: 'confirm', feature: GeoJSON.Feature): void
@@ -183,6 +191,7 @@ const maxMsg = computed(() => {
       v-if="activeMode === 'radius'"
       :model-value="radiusKm"
       :label="t('radius.label')"
+      :step="radiusStep"
       :min-message="minMsg"
       :max-message="maxMsg"
       @update:model-value="setRadius($event)"

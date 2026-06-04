@@ -1,10 +1,13 @@
 <script setup lang="ts">
-defineProps<{
+withDefaults(defineProps<{
   modelValue: number
   label: string
+  step?: number
   minMessage?: string
   maxMessage?: string
-}>()
+}>(), {
+  step: 1,
+})
 
 const emit = defineEmits<{
   (e: 'update:modelValue', val: number): void
@@ -29,7 +32,7 @@ function onBlur() {
     <input
       type="number"
       min="0"
-      step="0.1"
+      :step="step"
       :value="modelValue"
       class="vmr-radius-field"
       @input="onInput"
