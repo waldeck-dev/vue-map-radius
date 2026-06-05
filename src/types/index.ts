@@ -123,3 +123,8 @@ export interface MapRadiusModeToggleOptions {
 export interface MapRadiusMapOptions {
   style?: string
 }
+
+export interface MapRadiusGeoOptions {
+  coordPrecision?: number
+  simplifyTolerance?: number
+}

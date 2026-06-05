@@ -1,9 +1,10 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import type { Mode, GeocodingResult, MapRadiusProps, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusConfirmOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions } from '../types'
+import type { Mode, GeocodingResult, MapRadiusProps, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusConfirmOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
 import { useGeocoding } from '../composables/useGeocoding'
 import { useRadius } from '../composables/useRadius'
+import { useGeoJSON } from '../composables/useGeoJSON'
 import { circleToPolygon, toGeoJSON } from '../utils/geo'
 import SearchBar from './subcomponents/VMPSearchBar.vue'
 import ModeToggle from './subcomponents/VMPModeToggle.vue'
@@ -28,6 +29,7 @@ const props = withDefaults(defineProps<{
   confirmOptions?: MapRadiusConfirmOptions
   modeToggleOptions?: MapRadiusModeToggleOptions
   mapOptions?: MapRadiusMapOptions
+  geoOptions?: MapRadiusGeoOptions
 }>(), {
   center: () => [0, 20] as [number, number],
   zoom: 2,
@@ -47,6 +49,7 @@ const emit = defineEmits<{
 const { t } = useTranslation(props.locale, props.translations)
 const { search: geocodeSearch, results: searchResults, loading: searchLoading, error: searchError, fetchFeatureDetail } = useGeocoding(props.apiKey)
 const { radiusKm, setRadius, clamp, validationMessage, center: radiusCenter, setCenter } = useRadius(props.minRadius, props.maxRadius)
+const { trimPrecision, simplify } = useGeoJSON(props.geoOptions)
 
 const activeMode = ref<Mode>(props.mode)
 const searchQuery = ref('')
@@ -117,9 +120,9 @@ async function onSelect(result: GeocodingResult) {
         errorMsg.value = t('info.nonPolygon')
         return
       }
-      polygonFeature.value = toGeoJSON(feature.geometry)
+      polygonFeature.value = simplify(toGeoJSON(feature.geometry))
       polygonName.value = feature.text
-      mapContainerRef.value?.updatePolygon(polygonFeature.value)
+      mapContainerRef.value?.updatePolygon(polygonFeature.value!)
       mapContainerRef.value?.setVisibility('polygon')
       if (feature.bbox) {
         mapContainerRef.value?.fitBounds(feature.bbox)
@@ -178,9 +181,9 @@ const canConfirm = computed(() => {
 function onConfirm() {
   if (activeMode.value === 'radius' && centerPoint.value && radiusKm.value > 0) {
     const coords = circleToPolygon(centerPoint.value, radiusKm.value)
-    emit('confirm', toGeoJSON([coords]))
+    emit('confirm', trimPrecision(toGeoJSON([coords])))
   } else if (activeMode.value === 'polygon' && polygonFeature.value) {
-    emit('confirm', polygonFeature.value)
+    emit('confirm', trimPrecision(polygonFeature.value))
   }
 }
 

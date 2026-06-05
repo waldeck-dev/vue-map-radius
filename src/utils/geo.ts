@@ -1,4 +1,4 @@
-import type { GeoJSON } from 'geojson'
+﻿import type { GeoJSON } from 'geojson'
 
 export function circleToPolygon(
   center: [number, number],
@@ -43,4 +43,123 @@ export function toGeoJSON(
     properties: {},
     geometry,
   }
+}
+
+function trimCoords(value: unknown, decimals: number): unknown {
+  if (typeof value === 'number') {
+    return Number(value.toFixed(decimals))
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => trimCoords(v, decimals))
+  }
+  if (value !== null && typeof value === 'object') {
+    const result: Record<string, unknown> = {}
+    for (const key of Object.keys(value as Record<string, unknown>)) {
+      result[key] = trimCoords((value as Record<string, unknown>)[key], decimals)
+    }
+    return result
+  }
+  return value
+}
+
+export function trimCoordPrecision<T extends GeoJSON.GeoJSON | GeoJSON.Geometry | GeoJSON.Feature>(
+  geojson: T,
+  decimals: number = 6,
+): T {
+  return trimCoords(geojson, decimals) as T
+}
+
+function perpendicularDistance(
+  p: [number, number],
+  a: [number, number],
+  b: [number, number],
+): number {
+  const dx = b[0] - a[0]
+  const dy = b[1] - a[1]
+  const numerator = Math.abs(dy * p[0] - dx * p[1] + b[0] * a[1] - b[1] * a[0])
+  const denominator = Math.sqrt(dx * dx + dy * dy)
+  if (denominator === 0) {
+    return Math.sqrt((p[0] - a[0]) ** 2 + (p[1] - a[1]) ** 2)
+  }
+  return numerator / denominator
+}
+
+export function ramerDouglasPeucker(
+  points: [number, number][],
+  tolerance: number,
+): [number, number][] {
+  if (points.length <= 2) return points
+
+  let maxDist = 0
+  let maxIdx = 0
+  const first = points[0]
+  const last = points[points.length - 1]
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const dist = perpendicularDistance(points[i], first, last)
+    if (dist > maxDist) {
+      maxDist = dist
+      maxIdx = i
+    }
+  }
+
+  if (maxDist > tolerance) {
+    const left = ramerDouglasPeucker(points.slice(0, maxIdx + 1), tolerance)
+    const right = ramerDouglasPeucker(points.slice(maxIdx), tolerance)
+    return [...left.slice(0, -1), ...right]
+  }
+
+  return [first, last]
+}
+
+function simplifyRing(
+  ring: [number, number][],
+  tolerance: number,
+): [number, number][] {
+  if (ring.length <= 3) return ring
+  const isClosed =
+    ring[0][0] === ring[ring.length - 1][0] &&
+    ring[0][1] === ring[ring.length - 1][1]
+  const points = isClosed ? ring.slice(0, -1) : ring
+  const simplified = ramerDouglasPeucker(points, tolerance)
+  if (isClosed && simplified.length > 0) {
+    simplified.push([simplified[0][0], simplified[0][1]])
+  }
+  return simplified
+}
+
+export function simplifyPolygon(
+  feature: GeoJSON.Feature,
+  tolerance: number,
+): GeoJSON.Feature {
+  const geom = feature.geometry
+  if (!geom) return feature
+
+  if (geom.type === 'Polygon') {
+    const polygon = geom as GeoJSON.Polygon
+    return {
+      ...feature,
+      geometry: {
+        type: 'Polygon',
+        coordinates: polygon.coordinates.map(
+          (ring) => simplifyRing(ring as [number, number][], tolerance),
+        ),
+      },
+    }
+  }
+
+  if (geom.type === 'MultiPolygon') {
+    const multi = geom as GeoJSON.MultiPolygon
+    return {
+      ...feature,
+      geometry: {
+        type: 'MultiPolygon',
+        coordinates: multi.coordinates.map((polygon) =>
+          polygon.map((ring) => simplifyRing(ring as [number, number][], tolerance)),
+        ),
+      },
+    }
+  }
+
+  return feature
 }

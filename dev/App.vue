@@ -15,6 +15,7 @@ function onConfirm(feature: any) {
     :max-radius="1000"
     locale="en"
     height="600px"
+    :geo-options="{ coordPrecision: 4, simplifyTolerance: 0.03 }"
     @confirm="onConfirm"
   />
 </template>
