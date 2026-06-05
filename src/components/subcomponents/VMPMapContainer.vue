@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useMap } from '../../composables/useMap'
 
@@ -7,6 +7,7 @@ const props = defineProps<{
   center: [number, number]
   zoom: number
   height: string
+  mapStyle?: string
 }>()
 
 const containerId = 'vmr-map-' + Math.random().toString(36).slice(2, 8)
@@ -23,7 +24,7 @@ const {
   clearCircle,
   clearPolygon,
   destroy,
-} = useMap(containerId, props.apiKey, props.center, props.zoom)
+} = useMap(containerId, props.apiKey, props.center, props.zoom, props.mapStyle)
 
 onMounted(() => {
   init()

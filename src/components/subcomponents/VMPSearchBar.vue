@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import type { GeocodingResult } from '../../types'
 import { ref, watch } from 'vue'
 
@@ -7,6 +7,8 @@ const props = defineProps<{
   placeholder: string
   results: GeocodingResult[]
   loading: boolean
+  noResultsText?: string
+  loadingText?: string
 }>()
 
 const emit = defineEmits<{
@@ -72,14 +74,14 @@ watch(() => props.modelValue, () => {
         class="vmr-search-dropdown-item vmr-search-loading"
         role="status"
       >
-        Loading...
+        {{ loadingText || 'Loading...' }}
       </div>
       <div
         v-else-if="results.length === 0"
         class="vmr-search-dropdown-item vmr-search-no-results"
         role="status"
       >
-        No results found
+        {{ noResultsText || 'No results found' }}
       </div>
       <div
         v-for="result in results"

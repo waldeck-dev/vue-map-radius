@@ -1,4 +1,4 @@
-﻿import type { GeoJSON } from 'geojson'
+import type { GeoJSON } from 'geojson'
 
 export type Mode = 'radius' | 'polygon'
 
@@ -31,7 +31,6 @@ export interface ModeToggleProps {
 export interface RadiusInputProps {
   modelValue: number
   label: string
-  step?: number
   minMessage?: string
   maxMessage?: string
 }
@@ -100,4 +99,27 @@ export interface MapInstanceState {
   polygonSource: string
   polygonFillLayer: string
   polygonLineLayer: string
+}
+
+export interface MapRadiusSearchOptions {
+  placeholder?: string
+  noResultsText?: string
+  loadingText?: string
+}
+
+export interface MapRadiusRadiusOptions {
+  label?: string
+}
+
+export interface MapRadiusConfirmOptions {
+  label?: string
+}
+
+export interface MapRadiusModeToggleOptions {
+  radiusLabel?: string
+  polygonLabel?: string
+}
+
+export interface MapRadiusMapOptions {
+  style?: string
 }

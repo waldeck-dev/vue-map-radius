@@ -1,4 +1,4 @@
-﻿import { ref, onUnmounted } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import type { Ref } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -30,6 +30,7 @@ export function useMap(
   apiKey: string,
   center: [number, number],
   zoom: number,
+  styleUrl?: string,
 ): UseMapReturn {
   const map = ref<maplibregl.Map | null>(null) as Ref<maplibregl.Map | null>
   const mapReady = ref(false)
@@ -39,7 +40,7 @@ export function useMap(
 
     const instance = new maplibregl.Map({
       container: containerId,
-      style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${apiKey}`,
+      style: buildStyleUrl(styleUrl, apiKey),
       center,
       zoom,
     })
@@ -167,6 +168,13 @@ export function useMap(
     clearPolygon,
     destroy,
   }
+}
+
+function buildStyleUrl(url: string | undefined, key: string): string {
+  if (!url) return "https://api.maptiler.com/maps/streets-v2/style.json?key=" + key
+  if (/\bkey=/.test(url)) return url
+  const sep = url.includes('?') ? '&' : '?'
+  return url + sep + 'key=' + key
 }
 
 function emptyFeature(): GeoJSON.Feature {

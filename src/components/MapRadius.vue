@@ -1,6 +1,6 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import type { Mode, GeocodingResult, MapRadiusProps } from '../types'
+import type { Mode, GeocodingResult, MapRadiusProps, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusConfirmOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
 import { useGeocoding } from '../composables/useGeocoding'
 import { useRadius } from '../composables/useRadius'
@@ -23,6 +23,11 @@ const props = withDefaults(defineProps<{
   height?: string
   locale?: string
   translations?: Record<string, Record<string, string>>
+  searchOptions?: MapRadiusSearchOptions
+  radiusOptions?: MapRadiusRadiusOptions
+  confirmOptions?: MapRadiusConfirmOptions
+  modeToggleOptions?: MapRadiusModeToggleOptions
+  mapOptions?: MapRadiusMapOptions
 }>(), {
   center: () => [0, 20] as [number, number],
   zoom: 2,
@@ -34,12 +39,6 @@ const props = withDefaults(defineProps<{
   locale: 'en',
   translations: () => ({}),
 })
-
-watch(() => props.radiusStep, (val) => {
-  if (val < 0) {
-    console.warn('[vue-map-radius] radiusStep must be >= 0, got ' + val)
-  }
-}, { immediate: true })
 
 const emit = defineEmits<{
   (e: 'confirm', feature: GeoJSON.Feature): void
@@ -60,6 +59,22 @@ const mapContainerRef = ref<InstanceType<typeof MapContainer>>()
 const errorMsg = ref<string | null>(null)
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
+
+// --- Merged display strings (grouped prop > translation > built-in) ---
+const searchPlaceholder = computed(() => props.searchOptions?.placeholder ?? t('search.placeholder'))
+const searchNoResultsText = computed(() => props.searchOptions?.noResultsText ?? t('info.noResults'))
+const searchLoadingText = computed(() => props.searchOptions?.loadingText ?? t('search.loading'))
+const radiusLabel = computed(() => props.radiusOptions?.label ?? t('radius.label'))
+const confirmLabel = computed(() => props.confirmOptions?.label ?? t('confirm.button'))
+const modeRadiusLabel = computed(() => props.modeToggleOptions?.radiusLabel ?? t('mode.radius'))
+const modePolygonLabel = computed(() => props.modeToggleOptions?.polygonLabel ?? t('mode.polygon'))
+const mapStyleUrl = computed(() => props.mapOptions?.style)
+
+watch(() => props.radiusStep, (val) => {
+  if (val < 0) {
+    console.warn('[vue-map-radius] radiusStep must be >= 0, got ' + val)
+  }
+}, { immediate: true })
 
 if (!props.apiKey) {
   console.warn('[vue-map-radius] MapTiler API key is required')
@@ -187,21 +202,21 @@ const maxMsg = computed(() => {
     <slot
       name="mode-toggle"
       :mode="activeMode"
-      :radius-label="t('mode.radius')"
-      :polygon-label="t('mode.polygon')"
+      :radius-label="modeRadiusLabel"
+      :polygon-label="modePolygonLabel"
       :switch-mode="(m: Mode) => activeMode = m"
     >
       <ModeToggle
         :mode="activeMode"
-        :radius-label="t('mode.radius')"
-        :polygon-label="t('mode.polygon')"
+        :radius-label="modeRadiusLabel"
+        :polygon-label="modePolygonLabel"
         @update:mode="activeMode = $event"
       />
     </slot>
     <slot
       name="search-bar"
       :query="searchQuery"
-      :placeholder="t('search.placeholder')"
+      :placeholder="searchPlaceholder"
       :results="searchResults"
       :loading="searchLoading"
       :update-query="(val: string) => searchQuery = val"
@@ -209,9 +224,11 @@ const maxMsg = computed(() => {
     >
       <SearchBar
         :model-value="searchQuery"
-        :placeholder="t('search.placeholder')"
+        :placeholder="searchPlaceholder"
         :results="searchResults"
         :loading="searchLoading"
+        :no-results-text="searchNoResultsText"
+        :loading-text="searchLoadingText"
         @update:model-value="searchQuery = $event"
         @select="onSelect"
       />
@@ -221,8 +238,8 @@ const maxMsg = computed(() => {
       name="radius-input"
       :radius="radiusKm"
       :set-radius="setRadius"
-      :label="t('radius.label')"
-      :step="radiusStep"
+      :label="radiusLabel"
+      :step="props.radiusStep"
       :min-message="minMsg"
       :max-message="maxMsg"
       :min-radius="minRadius"
@@ -231,8 +248,8 @@ const maxMsg = computed(() => {
     >
       <RadiusInput
         :model-value="radiusKm"
-        :label="t('radius.label')"
-        :step="radiusStep"
+        :label="radiusLabel"
+        :step="props.radiusStep"
         :min-message="minMsg"
         :max-message="maxMsg"
         @update:model-value="setRadius($event)"
@@ -241,13 +258,13 @@ const maxMsg = computed(() => {
     </slot>
     <slot
       name="confirm-button"
-      :label="t('confirm.button')"
+      :label="confirmLabel"
       :on-confirm="onConfirm"
       :loading="detailLoading"
       :disabled="!canConfirm"
     >
       <ConfirmButton
-        :label="t('confirm.button')"
+        :label="confirmLabel"
         :loading="detailLoading"
         :disabled="!canConfirm"
         @confirm="onConfirm"
@@ -260,6 +277,7 @@ const maxMsg = computed(() => {
       :center="center"
       :zoom="zoom"
       :height="height"
+      :map-style="mapStyleUrl"
     />
   </div>
 </template>

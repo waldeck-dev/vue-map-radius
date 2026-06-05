@@ -10,6 +10,7 @@ const fr: Record<string, string> = {
   'radius.maxMessage': 'Le rayon maximum est {max} km',
   'radius.minMessage': 'Le rayon minimum est {min} km',
   'search.placeholder': 'Rechercher un lieu...',
+  'search.loading': 'Chargement...',
 }
 
 export default fr
