@@ -173,34 +173,71 @@ const maxMsg = computed(() => {
 
 <template>
   <div class="vmr-map-radius">
-    <ModeToggle
+    <slot
+      name="mode-toggle"
       :mode="activeMode"
       :radius-label="t('mode.radius')"
       :polygon-label="t('mode.polygon')"
-      @update:mode="activeMode = $event"
-    />
-    <SearchBar
-      :model-value="searchQuery"
+      :switch-mode="(m: Mode) => activeMode = m"
+    >
+      <ModeToggle
+        :mode="activeMode"
+        :radius-label="t('mode.radius')"
+        :polygon-label="t('mode.polygon')"
+        @update:mode="activeMode = $event"
+      />
+    </slot>
+    <slot
+      name="search-bar"
+      :query="searchQuery"
       :placeholder="t('search.placeholder')"
       :results="searchResults"
       :loading="searchLoading"
-      @update:model-value="searchQuery = $event"
-      @select="onSelect"
-    />
-    <RadiusInput
+      :update-query="(val: string) => searchQuery = val"
+      :on-select="onSelect"
+    >
+      <SearchBar
+        :model-value="searchQuery"
+        :placeholder="t('search.placeholder')"
+        :results="searchResults"
+        :loading="searchLoading"
+        @update:model-value="searchQuery = $event"
+        @select="onSelect"
+      />
+    </slot>
+    <slot
       v-if="activeMode === 'radius'"
-      :model-value="radiusKm"
+      name="radius-input"
+      :radius="radiusKm"
+      :set-radius="setRadius"
       :label="t('radius.label')"
       :step="radiusStep"
       :min-message="minMsg"
       :max-message="maxMsg"
-      @update:model-value="setRadius($event)"
-      @blur="onRadiusBlur"
-    />
-    <ConfirmButton
+      :min-radius="minRadius"
+      :max-radius="maxRadius"
+      :on-blur="onRadiusBlur"
+    >
+      <RadiusInput
+        :model-value="radiusKm"
+        :label="t('radius.label')"
+        :step="radiusStep"
+        :min-message="minMsg"
+        :max-message="maxMsg"
+        @update:model-value="setRadius($event)"
+        @blur="onRadiusBlur"
+      />
+    </slot>
+    <slot
+      name="confirm-button"
       :label="t('confirm.button')"
-      @confirm="onConfirm"
-    />
+      :on-confirm="onConfirm"
+    >
+      <ConfirmButton
+        :label="t('confirm.button')"
+        @confirm="onConfirm"
+      />
+    </slot>
     <div v-if="errorMsg" class="vmr-error-msg">{{ errorMsg }}</div>
     <MapContainer
       ref="mapContainerRef"
