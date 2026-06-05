@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import type { Mode, GeocodingResult, MapRadiusProps, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusConfirmOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
@@ -30,12 +30,14 @@ const props = withDefaults(defineProps<{
   modeToggleOptions?: MapRadiusModeToggleOptions
   mapOptions?: MapRadiusMapOptions
   geoOptions?: MapRadiusGeoOptions
+  modes?: Mode[]
 }>(), {
   center: () => [0, 20] as [number, number],
   zoom: 2,
   minRadius: 0,
   maxRadius: Infinity,
   radiusStep: 1,
+  modes: () => ['radius', 'polygon'] as Mode[],
   mode: 'radius' as Mode,
   height: '500px',
   locale: 'en',
@@ -72,6 +74,13 @@ const confirmLabel = computed(() => props.confirmOptions?.label ?? t('confirm.bu
 const modeRadiusLabel = computed(() => props.modeToggleOptions?.radiusLabel ?? t('mode.radius'))
 const modePolygonLabel = computed(() => props.modeToggleOptions?.polygonLabel ?? t('mode.polygon'))
 const mapStyleUrl = computed(() => props.mapOptions?.style)
+const showModeToggle = computed(() => props.modes.length > 1)
+
+watch(() => props.modes, (modes) => {
+  if (modes.length === 1 && !modes.includes(activeMode.value)) {
+    activeMode.value = modes[0]
+  }
+}, { immediate: true })
 
 watch(() => props.radiusStep, (val) => {
   if (val < 0) {
@@ -202,8 +211,7 @@ const maxMsg = computed(() => {
 
 <template>
   <div class="vmr-map-radius">
-    <slot
-      name="mode-toggle"
+    <slot v-if="showModeToggle" name="mode-toggle"
       :mode="activeMode"
       :radius-label="modeRadiusLabel"
       :polygon-label="modePolygonLabel"

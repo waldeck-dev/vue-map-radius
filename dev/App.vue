@@ -11,6 +11,7 @@ function onConfirm(feature: any) {
     api-key="HvOAhdmNWKWQ2xN55ls3"
     :center="[2.2137, 46.2276]"
     :zoom="5"
+    :modes="['radius']"
     :min-radius="0"
     :max-radius="1000"
     locale="en"

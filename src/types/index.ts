@@ -13,6 +13,7 @@ export interface MapRadiusProps {
   height?: string
   locale?: string
   translations?: Record<string, Record<string, string>>
+  modes?: Mode[]
 }
 
 export interface SearchBarProps {
