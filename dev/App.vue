@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import MapRadius from '../src/components/MapRadius.vue'
 
 function onConfirm(feature: any) {
@@ -25,5 +25,13 @@ body {
   padding: 20px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: #f3f4f6;
+}
+
+.vmr-map-radius {
+  gap: 12px;
+  padding: 16px;
+  background: #ffffff;
+  border-radius: var(--vmr-search-radius, 6px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 </style>

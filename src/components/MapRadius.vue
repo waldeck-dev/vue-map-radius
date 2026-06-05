@@ -253,11 +253,6 @@ const maxMsg = computed(() => {
 .vmr-map-radius {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  background: #ffffff;
-  border-radius: var(--vmr-search-radius, 6px);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 .vmr-error-msg {
   font-size: 13px;
