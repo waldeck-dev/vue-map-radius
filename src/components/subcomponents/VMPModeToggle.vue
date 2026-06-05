@@ -1,5 +1,5 @@
-<script setup lang="ts">
-import type { Mode } from '../types'
+﻿<script setup lang="ts">
+import type { Mode } from '../../types'
 
 defineProps<{
   mode: Mode

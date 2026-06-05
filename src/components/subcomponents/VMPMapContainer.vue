@@ -1,6 +1,6 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useMap } from '../composables/useMap'
+import { useMap } from '../../composables/useMap'
 
 const props = defineProps<{
   apiKey: string

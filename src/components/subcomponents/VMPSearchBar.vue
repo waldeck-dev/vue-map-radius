@@ -1,5 +1,5 @@
-<script setup lang="ts">
-import type { GeocodingResult } from '../types'
+﻿<script setup lang="ts">
+import type { GeocodingResult } from '../../types'
 import { ref, watch } from 'vue'
 
 const props = defineProps<{

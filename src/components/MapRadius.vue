@@ -1,15 +1,15 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import type { Mode, GeocodingResult, MapRadiusProps } from '../types'
 import { useTranslation } from '../composables/useTranslation'
 import { useGeocoding } from '../composables/useGeocoding'
 import { useRadius } from '../composables/useRadius'
 import { circleToPolygon, toGeoJSON } from '../utils/geo'
-import SearchBar from './SearchBar.vue'
-import ModeToggle from './ModeToggle.vue'
-import RadiusInput from './RadiusInput.vue'
-import ConfirmButton from './ConfirmButton.vue'
-import MapContainer from './MapContainer.vue'
+import SearchBar from './subcomponents/VMPSearchBar.vue'
+import ModeToggle from './subcomponents/VMPModeToggle.vue'
+import RadiusInput from './subcomponents/VMPRadiusInput.vue'
+import ConfirmButton from './subcomponents/VMPConfirmButton.vue'
+import MapContainer from './subcomponents/VMPMapContainer.vue'
 import type { GeoJSON } from 'geojson'
 
 const props = withDefaults(defineProps<{

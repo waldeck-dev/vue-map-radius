@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 withDefaults(defineProps<{
   modelValue: number
   label: string
