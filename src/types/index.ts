@@ -129,3 +129,8 @@ export interface MapRadiusGeoOptions {
   coordPrecision?: number
   simplifyTolerance?: number
 }
+export interface MapRadiusInteractiveOptions {
+  draggableCenter?: boolean
+  draggableRadius?: boolean
+  showRadiusTooltip?: boolean
+}

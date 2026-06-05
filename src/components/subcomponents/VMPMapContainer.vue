@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useMap } from '../../composables/useMap'
+import type { MapRadiusInteractiveOptions } from '../../types'
 
 const props = defineProps<{
   apiKey: string
@@ -8,6 +9,7 @@ const props = defineProps<{
   zoom: number
   height: string
   mapStyle?: string
+  interactiveOptions?: MapRadiusInteractiveOptions
 }>()
 
 const containerId = 'vmr-map-' + Math.random().toString(36).slice(2, 8)
@@ -24,6 +26,20 @@ const {
   clearCircle,
   clearPolygon,
   destroy,
+
+  setCenterMarker,
+  updateCenterMarkerPosition,
+  removeCenterMarker,
+
+  setRadiusHandle,
+  updateRadiusHandlePosition,
+  removeRadiusHandle,
+
+  setRadiusLine,
+  removeRadiusLine,
+
+  setRadiusTooltip,
+  hideRadiusTooltip,
 } = useMap(containerId, props.apiKey, props.center, props.zoom, props.mapStyle)
 
 onMounted(() => {
@@ -40,6 +56,20 @@ defineExpose({
   clearCircle,
   clearPolygon,
   destroy,
+
+  setCenterMarker,
+  updateCenterMarkerPosition,
+  removeCenterMarker,
+
+  setRadiusHandle,
+  updateRadiusHandlePosition,
+  removeRadiusHandle,
+
+  setRadiusLine,
+  removeRadiusLine,
+
+  setRadiusTooltip,
+  hideRadiusTooltip,
 })
 </script>
 

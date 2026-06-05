@@ -1,4 +1,4 @@
-﻿import type { GeoJSON } from 'geojson'
+import type { GeoJSON } from 'geojson'
 
 export function circleToPolygon(
   center: [number, number],
@@ -162,4 +162,46 @@ export function simplifyPolygon(
   }
 
   return feature
+}
+
+export function haversineDistance(
+  a: [number, number],
+  b: [number, number],
+): number {
+  const [lng1, lat1] = a
+  const [lng2, lat2] = b
+  const R = 6371
+  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const sinDLat = Math.sin(dLat / 2)
+  const sinDLng = Math.sin(dLng / 2)
+  const aVal =
+    sinDLat * sinDLat +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * sinDLng * sinDLng
+  return R * 2 * Math.atan2(Math.sqrt(aVal), Math.sqrt(1 - aVal))
+}
+
+export function destinationPoint(
+  origin: [number, number],
+  distanceKm: number,
+  bearingDeg: number,
+): [number, number] {
+  const [lng, lat] = origin
+  const R = 6371
+  const d = distanceKm / R
+  const brng = (bearingDeg * Math.PI) / 180
+  const latRad = (lat * Math.PI) / 180
+  const lngRad = (lng * Math.PI) / 180
+  const newLatRad = Math.asin(
+    Math.sin(latRad) * Math.cos(d) +
+      Math.cos(latRad) * Math.sin(d) * Math.cos(brng),
+  )
+  const newLngRad =
+    lngRad +
+    Math.atan2(
+      Math.sin(brng) * Math.sin(d) * Math.cos(latRad),
+      Math.cos(d) - Math.sin(latRad) * Math.sin(newLatRad),
+    )
+  return [(newLngRad * 180) / Math.PI, (newLatRad * 180) / Math.PI]
 }

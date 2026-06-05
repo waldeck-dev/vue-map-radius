@@ -1,6 +1,6 @@
-﻿import type { GeoJSON } from 'geojson'
+import type { GeoJSON } from 'geojson'
 import { describe, it, expect } from 'vitest'
-import { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon } from '../utils/geo'
+import { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint } from '../utils/geo'
 
 describe('circleToPolygon', () => {
   it('should return 64 points by default', () => {
@@ -199,5 +199,62 @@ describe('simplifyPolygon', () => {
     const geom = result.geometry as GeoJSON.MultiPolygon
     const ring = geom.coordinates[0][0]
     expect(ring[ring.length - 1]).toEqual(ring[0])
+  })
+})
+describe('haversineDistance', () => {
+  it('returns 0 for same point', () => {
+    expect(haversineDistance([0, 0], [0, 0])).toBe(0)
+  })
+
+  it('returns ~111 km for 1 degree latitude', () => {
+    const dist = haversineDistance([0, 0], [0, 1])
+    expect(dist).toBeCloseTo(111.32, 0)
+  })
+
+  it('returns ~111 km for 1 degree longitude at equator', () => {
+    const dist = haversineDistance([0, 0], [1, 0])
+    expect(dist).toBeCloseTo(111.32, 0)
+  })
+
+  it('computes known distance Paris-London', () => {
+    const paris = [2.35, 48.85]
+    const london = [-0.12, 51.5]
+    const dist = haversineDistance(paris, london)
+    expect(dist).toBeGreaterThan(330)
+    expect(dist).toBeLessThan(360)
+  })
+
+  it('is commutative', () => {
+    const a = [10, 20]
+    const b = [30, 40]
+    expect(haversineDistance(a, b)).toBeCloseTo(haversineDistance(b, a), 6)
+  })
+})
+
+describe('destinationPoint', () => {
+  it('returns origin for 0 distance', () => {
+    const result = destinationPoint([10, 20], 0, 90)
+    expect(result[0]).toBeCloseTo(10, 8)
+    expect(result[1]).toBeCloseTo(20, 8)
+  })
+
+  it('moves north (bearing 0) correctly', () => {
+    const result = destinationPoint([0, 0], 111.32, 0)
+    expect(result[0]).toBeCloseTo(0, 4)
+    expect(result[1]).toBeCloseTo(1, 2)
+  })
+
+  it('moves east (bearing 90) correctly at equator', () => {
+    const result = destinationPoint([0, 0], 111.32, 90)
+    expect(result[0]).toBeCloseTo(1, 2)
+    expect(result[1]).toBeCloseTo(0, 4)
+  })
+
+  it('is round-trip consistent with haversineDistance', () => {
+    const origin = [10, 30]
+    const dist = 500
+    const dest = destinationPoint(origin, dist, 45)
+    const roundTrip = haversineDistance(origin, dest)
+    expect(roundTrip).toBeCloseTo(dist, 0)
   })
 })

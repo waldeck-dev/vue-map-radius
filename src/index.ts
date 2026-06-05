@@ -1,4 +1,4 @@
-﻿import MapRadius from './components/MapRadius.vue'
+import MapRadius from './components/MapRadius.vue'
 export default MapRadius
 export type {
   Mode,
@@ -18,6 +18,7 @@ export type {
   MapRadiusModeToggleOptions,
   MapRadiusMapOptions,
   MapRadiusGeoOptions,
+  MapRadiusInteractiveOptions,
 } from './types'
-export { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon } from './utils/geo'
+export { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint } from './utils/geo'
 export { useGeoJSON } from './composables/useGeoJSON'
