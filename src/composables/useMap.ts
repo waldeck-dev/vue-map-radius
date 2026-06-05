@@ -1,4 +1,5 @@
 ﻿import { ref, onUnmounted } from 'vue'
+import type { Ref } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoJSON } from 'geojson'
@@ -10,13 +11,27 @@ const POLYGON_SOURCE = 'vmr-polygon-source'
 const POLYGON_FILL_LAYER = 'vmr-polygon-fill'
 const POLYGON_LINE_LAYER = 'vmr-polygon-line'
 
+export interface UseMapReturn {
+  map: Ref<maplibregl.Map | null>
+  mapReady: Ref<boolean>
+  init: () => void
+  updateCircle: (coordinates: [number, number][]) => void
+  updatePolygon: (feature: GeoJSON.Feature) => void
+  setVisibility: (mode: 'radius' | 'polygon') => void
+  fitBounds: (bbox: [number, number, number, number], padding?: number) => void
+  flyTo: (c: [number, number], z?: number) => void
+  clearCircle: () => void
+  clearPolygon: () => void
+  destroy: () => void
+}
+
 export function useMap(
   containerId: string,
   apiKey: string,
   center: [number, number],
   zoom: number,
-) {
-  const map = ref<maplibregl.Map | null>(null)
+): UseMapReturn {
+  const map = ref<maplibregl.Map | null>(null) as Ref<maplibregl.Map | null>
   const mapReady = ref(false)
 
   function init() {

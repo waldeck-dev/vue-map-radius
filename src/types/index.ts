@@ -1,4 +1,4 @@
-import type { GeoJSON } from 'geojson'
+﻿import type { GeoJSON } from 'geojson'
 
 export type Mode = 'radius' | 'polygon'
 
@@ -15,6 +15,40 @@ export interface MapRadiusProps {
   translations?: Record<string, Record<string, string>>
 }
 
+export interface SearchBarProps {
+  modelValue: string
+  placeholder: string
+  results: GeocodingResult[]
+  loading: boolean
+}
+
+export interface ModeToggleProps {
+  mode: Mode
+  radiusLabel: string
+  polygonLabel: string
+}
+
+export interface RadiusInputProps {
+  modelValue: number
+  label: string
+  step?: number
+  minMessage?: string
+  maxMessage?: string
+}
+
+export interface ConfirmButtonProps {
+  label: string
+  loading?: boolean
+  disabled?: boolean
+}
+
+export interface MapContainerProps {
+  apiKey: string
+  center: [number, number]
+  zoom: number
+  height: string
+}
+
 export interface GeocodingResult {
   id: string
   text: string
@@ -23,6 +57,25 @@ export interface GeocodingResult {
   bbox?: [number, number, number, number]
   type: string
   geometry?: GeoJSON.Geometry
+}
+
+export interface MapTilerFeature {
+  id: string
+  type: 'Feature'
+  place_type: string[]
+  text: string
+  place_name: string
+  center: [number, number]
+  bbox?: [number, number, number, number]
+  geometry?: GeoJSON.Geometry
+  properties: Record<string, unknown>
+  matching_text?: string
+  relevance?: number
+}
+
+export interface MapTilerGeocodingResponse {
+  type: 'FeatureCollection'
+  features: MapTilerFeature[]
 }
 
 export interface TranslationMap {

@@ -48,6 +48,8 @@ defineExpose({
     ref="containerRef"
     class="vmr-map-wrapper"
     :style="{ height }"
+    role="application"
+    aria-label="Map"
   />
 </template>
 

@@ -46,24 +46,38 @@ watch(() => props.modelValue, () => {
 </script>
 
 <template>
-  <div class="vmr-search-bar">
+  <div class="vmr-search-bar" role="combobox" aria-expanded="true" aria-haspopup="listbox">
     <input
       ref="inputRef"
       :value="modelValue"
       :placeholder="placeholder"
       class="vmr-search-input"
+      aria-label="Search for a place"
+      aria-autocomplete="list"
+      aria-controls="vmr-search-results"
+      role="searchbox"
+      type="text"
       @input="onInput"
       @focus="onFocus"
       @blur="onBlur"
-      type="text"
     />
-    <div v-if="showDropdown" class="vmr-search-dropdown">
-      <div v-if="loading" class="vmr-search-dropdown-item vmr-search-loading">
+    <div
+      v-if="showDropdown"
+      id="vmr-search-results"
+      class="vmr-search-dropdown"
+      role="listbox"
+    >
+      <div
+        v-if="loading"
+        class="vmr-search-dropdown-item vmr-search-loading"
+        role="status"
+      >
         Loading...
       </div>
       <div
         v-else-if="results.length === 0"
         class="vmr-search-dropdown-item vmr-search-no-results"
+        role="status"
       >
         No results found
       </div>
@@ -71,6 +85,8 @@ watch(() => props.modelValue, () => {
         v-for="result in results"
         :key="result.id"
         class="vmr-search-dropdown-item"
+        role="option"
+        :aria-label="result.placeName"
         @mousedown.prevent="onSelect(result)"
       >
         <span class="vmr-search-result-text">{{ result.text }}</span>

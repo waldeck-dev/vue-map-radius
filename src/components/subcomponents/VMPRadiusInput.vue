@@ -28,18 +28,20 @@ function onBlur() {
 
 <template>
   <div class="vmr-radius-input">
-    <label class="vmr-radius-label">{{ label }}</label>
+    <label class="vmr-radius-label" for="vmr-radius-field">{{ label }}</label>
     <input
+      id="vmr-radius-field"
       type="number"
       min="0"
       :step="step"
       :value="modelValue"
       class="vmr-radius-field"
+      aria-describedby="vmr-radius-msg"
       @input="onInput"
       @blur="onBlur"
     />
-    <span v-if="minMessage" class="vmr-radius-message">{{ minMessage }}</span>
-    <span v-else-if="maxMessage" class="vmr-radius-message">{{ maxMessage }}</span>
+    <span id="vmr-radius-msg" v-if="minMessage" class="vmr-radius-message" role="alert">{{ minMessage }}</span>
+    <span id="vmr-radius-msg" v-else-if="maxMessage" class="vmr-radius-message" role="alert">{{ maxMessage }}</span>
   </div>
 </template>
 

@@ -17,10 +17,12 @@ function setMode(m: Mode) {
 </script>
 
 <template>
-  <div class="vmr-mode-toggle">
+  <div class="vmr-mode-toggle" role="radiogroup" aria-label="Map mode">
     <button
       class="vmr-mode-btn"
       :class="{ 'vmr-mode-btn--active': mode === 'radius' }"
+      role="radio"
+      :aria-checked="mode === 'radius'"
       @click="setMode('radius')"
     >
       {{ radiusLabel }}
@@ -28,6 +30,8 @@ function setMode(m: Mode) {
     <button
       class="vmr-mode-btn"
       :class="{ 'vmr-mode-btn--active': mode === 'polygon' }"
+      role="radio"
+      :aria-checked="mode === 'polygon'"
       @click="setMode('polygon')"
     >
       {{ polygonLabel }}

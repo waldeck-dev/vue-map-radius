@@ -1,6 +1,8 @@
 ﻿<script setup lang="ts">
 defineProps<{
   label: string
+  loading?: boolean
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -11,8 +13,12 @@ const emit = defineEmits<{
 <template>
   <button
     class="vmr-confirm-btn"
+    :class="{ 'vmr-confirm-btn--loading': loading }"
+    :disabled="disabled || loading"
+    :aria-busy="loading ? 'true' : 'false'"
     @click="emit('confirm')"
   >
+    <span v-if="loading" class="vmr-confirm-spinner" aria-hidden="true" />
     {{ label }}
   </button>
 </template>
@@ -29,8 +35,27 @@ const emit = defineEmits<{
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
-.vmr-confirm-btn:hover {
+.vmr-confirm-btn:hover:not(:disabled) {
   opacity: 0.9;
+}
+.vmr-confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.vmr-confirm-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: vmr-spin 0.6s linear infinite;
+}
+@keyframes vmr-spin {
+  to { transform: rotate(360deg); }
 }
 </style>

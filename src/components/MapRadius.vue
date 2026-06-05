@@ -54,6 +54,7 @@ const searchQuery = ref('')
 const centerPoint = ref<[number, number] | null>(null)
 const polygonFeature = ref<GeoJSON.Feature | null>(null)
 const polygonName = ref<string | null>(null)
+const detailLoading = ref(false)
 
 const mapContainerRef = ref<InstanceType<typeof MapContainer>>()
 const errorMsg = ref<string | null>(null)
@@ -87,6 +88,7 @@ async function onSelect(result: GeocodingResult) {
     mapContainerRef.value?.flyTo(result.center, 10)
     renderCircle()
   } else {
+    detailLoading.value = true
     try {
       const feature = await fetchFeatureDetail(result.id)
       if (!feature || !feature.geometry) {
@@ -109,6 +111,8 @@ async function onSelect(result: GeocodingResult) {
       }
     } catch {
       errorMsg.value = t('error.network')
+    } finally {
+      detailLoading.value = false
     }
   }
 }
@@ -148,6 +152,13 @@ function onRadiusBlur() {
   clamp()
   renderCircle()
 }
+
+const canConfirm = computed(() => {
+  if (activeMode.value === 'radius') {
+    return centerPoint.value !== null && radiusKm.value > 0
+  }
+  return polygonFeature.value !== null
+})
 
 function onConfirm() {
   if (activeMode.value === 'radius' && centerPoint.value && radiusKm.value > 0) {
@@ -232,13 +243,17 @@ const maxMsg = computed(() => {
       name="confirm-button"
       :label="t('confirm.button')"
       :on-confirm="onConfirm"
+      :loading="detailLoading"
+      :disabled="!canConfirm"
     >
       <ConfirmButton
         :label="t('confirm.button')"
+        :loading="detailLoading"
+        :disabled="!canConfirm"
         @confirm="onConfirm"
       />
     </slot>
-    <div v-if="errorMsg" class="vmr-error-msg">{{ errorMsg }}</div>
+    <div v-if="errorMsg" class="vmr-error-msg" role="alert">{{ errorMsg }}</div>
     <MapContainer
       ref="mapContainerRef"
       :api-key="apiKey"

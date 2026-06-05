@@ -1,9 +1,21 @@
-import { ref } from 'vue'
-import type { GeocodingResult } from '../types'
+﻿import { ref } from 'vue'
+import type { GeocodingResult, MapTilerGeocodingResponse, MapTilerFeature } from '../types'
 
 const BASE_URL = 'https://api.maptiler.com/geocoding'
 
 const ADMIN_TYPES = 'country,region,subregion,county'
+
+function mapFeature(f: MapTilerFeature): GeocodingResult {
+  return {
+    id: f.id,
+    text: f.text,
+    placeName: f.place_name,
+    center: f.center,
+    bbox: f.bbox,
+    type: f.place_type?.[0] || f.type,
+    geometry: f.geometry,
+  }
+}
 
 export function useGeocoding(apiKey: string) {
   const results = ref<GeocodingResult[]>([])
@@ -36,15 +48,8 @@ export function useGeocoding(apiKey: string) {
         throw new Error(response.statusText || 'Geocoding API error')
       }
 
-      const data = await response.json()
-      results.value = (data.features || []).map((f: any) => ({
-        id: f.id,
-        text: f.text,
-        placeName: f.place_name,
-        center: f.center,
-        bbox: f.bbox,
-        type: f.place_type?.[0] || f.type,
-      }))
+      const data: MapTilerGeocodingResponse = await response.json()
+      results.value = (data.features || []).map(mapFeature)
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error'
       results.value = []
@@ -60,19 +65,11 @@ export function useGeocoding(apiKey: string) {
       throw new Error(`Geocoding detail API error: ${response.status}`)
     }
 
-    const data = await response.json()
-    const feature = data.features?.[0]
+    const data: MapTilerGeocodingResponse = await response.json()
+    const feature: MapTilerFeature | undefined = data.features?.[0]
     if (!feature) return null
 
-    return {
-      id: feature.id,
-      text: feature.text,
-      placeName: feature.place_name,
-      center: feature.center,
-      bbox: feature.bbox,
-      type: feature.place_type?.[0] || feature.type,
-      geometry: feature.geometry,
-    }
+    return mapFeature(feature)
   }
 
   return { search, results, error, loading, fetchFeatureDetail }
