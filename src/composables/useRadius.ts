@@ -8,10 +8,6 @@ export function useRadius(minRadius: number, maxRadius: number) {
     return Math.max(minRadius, Math.min(maxRadius, radiusKm.value))
   })
 
-  const isValid = computed(() => {
-    return radiusKm.value >= minRadius && radiusKm.value <= maxRadius
-  })
-
   const validationMessage = computed(() => {
     if (radiusKm.value < minRadius) {
       return { key: 'radius.minMessage', params: { min: minRadius } }
@@ -34,5 +30,5 @@ export function useRadius(minRadius: number, maxRadius: number) {
     radiusKm.value = clampedRadius.value
   }
 
-  return { radiusKm, clampedRadius, isValid, validationMessage, setRadius, setCenter, center, clamp }
+  return { radiusKm, clampedRadius, validationMessage, setRadius, setCenter, center, clamp }
 }

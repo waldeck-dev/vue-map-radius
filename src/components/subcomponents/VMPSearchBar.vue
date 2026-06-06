@@ -16,22 +16,24 @@ const emit = defineEmits<{
   (e: 'select', val: GeocodingResult): void
 }>()
 
-const inputRef = ref<HTMLInputElement>()
 const showDropdown = ref(false)
+const activeIndex = ref(-1)
 
 function onInput(e: Event) {
   const val = (e.target as HTMLInputElement).value
   emit('update:modelValue', val)
   showDropdown.value = val.length > 0
+  activeIndex.value = -1
 }
 
 function onSelect(result: GeocodingResult) {
   emit('select', result)
   showDropdown.value = false
+  activeIndex.value = -1
 }
 
 function onBlur() {
-  setTimeout(() => { showDropdown.value = false }, 200)
+  setTimeout(() => { showDropdown.value = false; activeIndex.value = -1 }, 200)
 }
 
 function onFocus() {
@@ -40,17 +42,34 @@ function onFocus() {
   }
 }
 
+function onKeydown(e: KeyboardEvent) {
+  if (!showDropdown.value) return
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    activeIndex.value = Math.min(activeIndex.value + 1, props.results.length - 1)
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    activeIndex.value = Math.max(activeIndex.value - 1, -1)
+  } else if (e.key === 'Enter' && activeIndex.value >= 0 && activeIndex.value < props.results.length) {
+    e.preventDefault()
+    onSelect(props.results[activeIndex.value])
+  } else if (e.key === 'Escape') {
+    showDropdown.value = false
+    activeIndex.value = -1
+  }
+}
+
 watch(() => props.modelValue, () => {
   if (props.modelValue.length === 0) {
     showDropdown.value = false
+    activeIndex.value = -1
   }
 })
 </script>
 
 <template>
-  <div class="vmr-search-bar" role="combobox" aria-expanded="true" aria-haspopup="listbox">
+  <div class="vmr-search-bar" role="combobox" :aria-expanded="showDropdown" aria-haspopup="listbox">
     <input
-      ref="inputRef"
       :value="modelValue"
       :placeholder="placeholder"
       class="vmr-search-input"
@@ -62,6 +81,7 @@ watch(() => props.modelValue, () => {
       @input="onInput"
       @focus="onFocus"
       @blur="onBlur"
+      @keydown="onKeydown"
     />
     <div
       v-if="showDropdown"
@@ -84,11 +104,13 @@ watch(() => props.modelValue, () => {
         {{ noResultsText || 'No results found' }}
       </div>
       <div
-        v-for="result in results"
+        v-for="(result, idx) in results"
         :key="result.id"
         class="vmr-search-dropdown-item"
+        :class="{ 'vmr-search-dropdown-item--active': idx === activeIndex }"
         role="option"
         :aria-label="result.placeName"
+        :aria-selected="idx === activeIndex"
         @mousedown.prevent="onSelect(result)"
       >
         <span class="vmr-search-result-text">{{ result.text }}</span>
@@ -138,7 +160,8 @@ watch(() => props.modelValue, () => {
   flex-direction: column;
   gap: 2px;
 }
-.vmr-search-dropdown-item:hover {
+.vmr-search-dropdown-item:hover,
+.vmr-search-dropdown-item--active {
   background: rgba(59, 130, 246, 0.08);
 }
 .vmr-search-result-text {

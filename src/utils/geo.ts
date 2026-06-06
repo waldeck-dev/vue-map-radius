@@ -176,10 +176,10 @@ export function haversineDistance(
   const dLng = toRad(lng2 - lng1)
   const sinDLat = Math.sin(dLat / 2)
   const sinDLng = Math.sin(dLng / 2)
-  const aVal =
+  const haversineA =
     sinDLat * sinDLat +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * sinDLng * sinDLng
-  return R * 2 * Math.atan2(Math.sqrt(aVal), Math.sqrt(1 - aVal))
+  return R * 2 * Math.atan2(Math.sqrt(haversineA), Math.sqrt(1 - haversineA))
 }
 
 export function destinationPoint(

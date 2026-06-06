@@ -8,48 +8,7 @@ export interface MapRadiusState {
   radiusKm: number
   polygon: GeoJSON.Feature | null
   name: string | null
-}
-
-export interface MapRadiusProps {
-  apiKey: string
-  center?: [number, number]
-  zoom?: number
-  minRadius?: number
-  maxRadius?: number
-  radiusStep?: number
-  radiusPolygonPoints?: number
-  mode?: Mode
-  height?: string
-  locale?: string
-  translations?: Record<string, Record<string, string>>
-  modes?: Mode[]
-}
-
-export interface SearchBarProps {
-  modelValue: string
-  placeholder: string
-  results: GeocodingResult[]
-  loading: boolean
-}
-
-export interface ModeToggleProps {
-  mode: Mode
-  radiusLabel: string
-  polygonLabel: string
-}
-
-export interface RadiusInputProps {
-  modelValue: number
-  label: string
-  minMessage?: string
-  maxMessage?: string
-}
-
-export interface MapContainerProps {
-  apiKey: string
-  center: [number, number]
-  zoom: number
-  height: string
+  bearing?: number
 }
 
 export interface GeocodingResult {
@@ -81,30 +40,6 @@ export interface MapTilerGeocodingResponse {
   features: MapTilerFeature[]
 }
 
-export interface TranslationMap {
-  [key: string]: Record<string, string>
-}
-
-export interface CircleState {
-  center: [number, number] | null
-  radiusKm: number
-}
-
-export interface PolygonState {
-  feature: GeoJSON.Feature | null
-  name: string | null
-}
-
-export interface MapInstanceState {
-  map: maplibregl.Map | null
-  circleSource: string
-  circleFillLayer: string
-  circleLineLayer: string
-  polygonSource: string
-  polygonFillLayer: string
-  polygonLineLayer: string
-}
-
 export interface MapRadiusSearchOptions {
   placeholder?: string
   noResultsText?: string
@@ -128,6 +63,7 @@ export interface MapRadiusGeoOptions {
   coordPrecision?: number
   simplifyTolerance?: number
 }
+
 export interface MapRadiusInteractiveOptions {
   draggableCenter?: boolean
   draggableRadius?: boolean

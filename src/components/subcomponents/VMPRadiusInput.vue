@@ -1,5 +1,7 @@
-﻿<script setup lang="ts">
-withDefaults(defineProps<{
+<script setup lang="ts">
+import { computed } from 'vue'
+
+const props = withDefaults(defineProps<{
   modelValue: number
   label: string
   step?: number
@@ -13,6 +15,12 @@ const emit = defineEmits<{
   (e: 'update:modelValue', val: number): void
   (e: 'blur'): void
 }>()
+
+const msgId = computed(() => {
+  if (props.minMessage) return 'vmr-radius-min-msg'
+  if (props.maxMessage) return 'vmr-radius-max-msg'
+  return undefined
+})
 
 function onInput(e: Event) {
   const val = parseFloat((e.target as HTMLInputElement).value)
@@ -36,12 +44,11 @@ function onBlur() {
       :step="step"
       :value="modelValue"
       class="vmr-radius-field"
-      aria-describedby="vmr-radius-msg"
+      :aria-describedby="msgId"
       @input="onInput"
       @blur="onBlur"
     />
-    <span id="vmr-radius-msg" v-if="minMessage" class="vmr-radius-message" role="alert">{{ minMessage }}</span>
-    <span id="vmr-radius-msg" v-else-if="maxMessage" class="vmr-radius-message" role="alert">{{ maxMessage }}</span>
+    <span v-if="msgId" :id="msgId" class="vmr-radius-message" role="alert">{{ minMessage || maxMessage }}</span>
   </div>
 </template>
 

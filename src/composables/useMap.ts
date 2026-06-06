@@ -41,6 +41,13 @@ export interface UseMapReturn {
   hideRadiusTooltip: () => void
 }
 
+export function buildStyleUrl(url: string | undefined, key: string): string {
+  if (!url) return 'https://api.maptiler.com/maps/streets-v2/style.json?key=' + key
+  if (/\bkey=/.test(url)) return url
+  const sep = url.includes('?') ? '&' : '?'
+  return url + sep + 'key=' + key
+}
+
 export function useMap(
   containerId: string,
   apiKey: string,
@@ -405,13 +412,6 @@ export function useMap(
     setRadiusTooltip,
     hideRadiusTooltip,
   }
-}
-
-function buildStyleUrl(url: string | undefined, key: string): string {
-  if (!url) return "https://api.maptiler.com/maps/streets-v2/style.json?key=" + key
-  if (/\bkey=/.test(url)) return url
-  const sep = url.includes('?') ? '&' : '?'
-  return url + sep + 'key=' + key
 }
 
 function emptyFeature(): GeoJSON.Feature {

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useMap } from '../../composables/useMap'
-import type { MapRadiusInteractiveOptions } from '../../types'
 
 const props = defineProps<{
   apiKey: string
@@ -9,7 +8,6 @@ const props = defineProps<{
   zoom: number
   height: string
   mapStyle?: string
-  interactiveOptions?: MapRadiusInteractiveOptions
 }>()
 
 const containerId = 'vmr-map-' + Math.random().toString(36).slice(2, 8)

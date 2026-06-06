@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
 import type { Mode, GeocodingResult, MapRadiusState, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
@@ -51,7 +51,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useTranslation(props.locale, props.translations)
-const { search: geocodeSearch, results: searchResults, loading: searchLoading, error: searchError, fetchFeatureDetail } = useGeocoding(props.apiKey)
+const { search: geocodeSearch, results: searchResults, loading: searchLoading, fetchFeatureDetail } = useGeocoding(props.apiKey)
 const { radiusKm, setRadius, clamp, validationMessage, center: radiusCenter, setCenter } = useRadius(props.minRadius, props.maxRadius)
 const { trimPrecision, simplify } = useGeoJSON(props.geoOptions)
 
@@ -61,7 +61,6 @@ const centerPoint = ref<[number, number] | null>(null)
 const handleBearing = ref<number>(90)
 const polygonFeature = ref<GeoJSON.Feature | null>(null)
 const polygonName = ref<string | null>(null)
-const detailLoading = ref(false)
 
 const mapContainerRef = ref<InstanceType<typeof MapContainer>>()
 const errorMsg = ref<string | null>(null)
@@ -80,7 +79,6 @@ function roundToStep(value: number, step: number): number {
 const draggableCenter = computed(() => props.interactiveOptions?.draggableCenter ?? true)
 const draggableRadius = computed(() => props.interactiveOptions?.draggableRadius ?? true)
 const showRadiusTooltip = computed(() => props.interactiveOptions?.showRadiusTooltip ?? true)
-const hasInteractiveFeatures = computed(() => draggableCenter.value || draggableRadius.value)
 
 const searchPlaceholder = computed(() => props.searchOptions?.placeholder ?? t('search.placeholder'))
 const searchNoResultsText = computed(() => props.searchOptions?.noResultsText ?? t('info.noResults'))
@@ -132,6 +130,9 @@ function hydrate(state: MapRadiusState) {
       setCenter(state.center)
     }
     setRadius(state.radiusKm)
+    if (state.bearing != null) {
+      handleBearing.value = state.bearing
+    }
   } else {
     centerPoint.value = state.center || null
     polygonFeature.value = state.polygon || null
@@ -154,6 +155,7 @@ function emitState() {
         ? trimPrecision(polygonFeature.value)
         : null,
     name: polygonName.value,
+    bearing: handleBearing.value,
   }
   emit('update:modelValue', state)
 }
@@ -175,7 +177,6 @@ async function onSelect(result: GeocodingResult) {
   searchQuery.value = result.text
   searchResults.value = []
   errorMsg.value = null
-  searchResults.value = []
 
   if (activeMode.value === 'radius') {
     centerPoint.value = result.center
@@ -185,7 +186,6 @@ async function onSelect(result: GeocodingResult) {
     updateInteractiveMarkers()
     emitState()
   } else {
-    detailLoading.value = true
     try {
       const feature = await fetchFeatureDetail(result.id)
       if (!feature || !feature.geometry) {
@@ -209,8 +209,6 @@ async function onSelect(result: GeocodingResult) {
       emitState()
     } catch {
       errorMsg.value = t('error.network')
-    } finally {
-      detailLoading.value = false
     }
   }
 }
@@ -262,7 +260,7 @@ function renderCurrentState() {
     if (bbox) {
       mapContainerRef.value.fitBounds(bbox)
     } else if (centerPoint.value) {
-      mapContainerRef.value.flyTo(centerPoint.value, 10)
+      mapContainerRef.value.flyTo(centerPoint.value)
     }
   }
 }
@@ -296,13 +294,9 @@ function updateInteractiveMarkers() {
       onDragEnd: onRadiusDragEnd,
       onDrag: onRadiusDrag,
     })
-  } else {
-    mc.removeRadiusHandle()
-  }
-
-  if (hasInteractiveFeatures.value) {
     mc.setRadiusLine(centerPoint.value, handlePos)
   } else {
+    mc.removeRadiusHandle()
     mc.removeRadiusLine()
   }
 
@@ -365,7 +359,7 @@ function onRadiusDrag(pos: [number, number]) {
 watch(radiusKm, () => {
   if (internalUpdating.value) return
   renderCircle()
-  if (hasInteractiveFeatures.value) {
+  if (draggableRadius.value) {
     nextTick(() => updateInteractiveMarkers())
   }
 })
@@ -374,7 +368,6 @@ watch(activeMode, (mode) => {
   searchResults.value = []
   searchQuery.value = ''
   errorMsg.value = null
-  searchResults.value = []
   if (mode === 'radius') {
     polygonFeature.value = null
     polygonName.value = null
@@ -482,7 +475,6 @@ const maxMsg = computed(() => {
       :zoom="zoom"
       :height="height"
       :map-style="mapStyleUrl"
-      :interactive-options="interactiveOptions"
     />
   </div>
 </template>
@@ -498,7 +490,4 @@ const maxMsg = computed(() => {
   text-align: center;
 }
 </style>
-
-
-
 

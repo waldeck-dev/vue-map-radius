@@ -3,15 +3,7 @@ export default MapRadius
 export type {
   Mode,
   MapRadiusState,
-  MapRadiusProps,
-  SearchBarProps,
-  ModeToggleProps,
-  RadiusInputProps,
-  MapContainerProps,
   GeocodingResult,
-  TranslationMap,
-  CircleState,
-  PolygonState,
   MapRadiusSearchOptions,
   MapRadiusRadiusOptions,
   MapRadiusModeToggleOptions,
@@ -21,3 +13,7 @@ export type {
 } from './types'
 export { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint } from './utils/geo'
 export { useGeoJSON } from './composables/useGeoJSON'
+export { useGeocoding } from './composables/useGeocoding'
+export { useTranslation } from './composables/useTranslation'
+export { useRadius } from './composables/useRadius'
+export { useMap, buildStyleUrl } from './composables/useMap'

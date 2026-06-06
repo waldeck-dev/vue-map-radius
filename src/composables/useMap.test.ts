@@ -1,15 +1,7 @@
 import { describe, it, expect } from 'vitest'
+import { buildStyleUrl } from './useMap'
 
 describe('buildStyleUrl', () => {
-  // Import is tricky since it's not exported; we test via the module behavior
-  // Instead, we'll re-implement the logic inline for testing
-  function buildStyleUrl(url: string | undefined, key: string): string {
-    if (!url) return 'https://api.maptiler.com/maps/streets-v2/style.json?key=' + key
-    if (/\bkey=/.test(url)) return url
-    const sep = url.includes('?') ? '&' : '?'
-    return url + sep + 'key=' + key
-  }
-
   it('returns default URL when no styleUrl provided', () => {
     const result = buildStyleUrl(undefined, 'abc123')
     expect(result).toBe('https://api.maptiler.com/maps/streets-v2/style.json?key=abc123')

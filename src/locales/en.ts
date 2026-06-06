@@ -1,4 +1,4 @@
-export default {
+const locales: Record<string, string> = {
   'search.placeholder': 'Search for a location...',
   'search.loading': 'Searching...',
   'info.noResults': 'No results found',
@@ -11,3 +11,5 @@ export default {
   'error.noApiKey': 'MapTiler API key is required',
   'error.network': 'Network error, please try again',
 }
+
+export default locales
