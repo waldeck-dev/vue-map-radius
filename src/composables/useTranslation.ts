@@ -11,7 +11,8 @@ export function useTranslation(
     ...(builtIn[locale] || builtIn['en']),
     ...(customTranslations[locale] || {}),
   }
-  const fallback: Record<string, string> = locale === 'en' ? merged : {
+
+  const fallback: Record<string, string> = {
     ...(builtIn['en'] || {}),
     ...(customTranslations['en'] || {}),
   }

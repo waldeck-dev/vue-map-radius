@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
 import type { Mode, GeocodingResult, MapRadiusState, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
@@ -345,12 +345,12 @@ function onRadiusDragEnd(pos: [number, number]) {
 function onRadiusDrag(pos: [number, number]) {
   if (!centerPoint.value) return
   const dist = haversineDistance(centerPoint.value, pos)
-  const displayDist = roundToStep(dist, props.radiusStep)
+  const clamped = Math.max(props.minRadius, Math.min(props.maxRadius, dist))
+  const displayDist = roundToStep(clamped, props.radiusStep)
   mapContainerRef.value?.setRadiusTooltip(displayDist + ' km', pos)
   const now = Date.now()
   if (now - lastDragUpdate < 50) return
   lastDragUpdate = now
-  const clamped = Math.max(props.minRadius, Math.min(props.maxRadius, dist))
   const coords = circleToPolygon(centerPoint.value, clamped)
   mapContainerRef.value?.updateCircle(coords)
   mapContainerRef.value?.setRadiusLine(centerPoint.value, pos)
@@ -453,8 +453,6 @@ const maxMsg = computed(() => {
       :step="props.radiusStep"
       :min-message="minMsg"
       :max-message="maxMsg"
-      :min-radius="minRadius"
-      :max-radius="maxRadius"
       :on-blur="onRadiusBlur"
     >
       <RadiusInput
@@ -490,4 +488,6 @@ const maxMsg = computed(() => {
   text-align: center;
 }
 </style>
+
+
 

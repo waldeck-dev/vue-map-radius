@@ -1,5 +1,5 @@
-﻿import { ref } from 'vue'
-import type { GeocodingResult, MapTilerGeocodingResponse, MapTilerFeature } from '../types'
+import { ref } from 'vue'
+import type { GeocodingResult, MapTilerGeocodingResponse, MapTilerFeature, Mode } from '../types'
 
 const BASE_URL = 'https://api.maptiler.com/geocoding'
 
@@ -22,7 +22,7 @@ export function useGeocoding(apiKey: string) {
   const error = ref<string | null>(null)
   const loading = ref(false)
 
-  async function search(query: string, mode: string) {
+  async function search(query: string, mode: Mode) {
     if (!query.trim()) {
       results.value = []
       return
@@ -74,3 +74,4 @@ export function useGeocoding(apiKey: string) {
 
   return { search, results, error, loading, fetchFeatureDetail }
 }
+
