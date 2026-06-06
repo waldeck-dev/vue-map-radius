@@ -1,15 +1,15 @@
-﻿# vue-map-radius
+# vue-map-radius
 
 **Pre-implementation spec.** SPEC.md — authoritative design doc (Vue 3 + Composition API, TypeScript, MapLibre GL JS, MapTiler, Vite, Vitest). `.env` requires `VITE_MAPTILER_KEY`; copy `.env.example` to `.env`.
 
 ## Commands
 
 ```
-npm run dev          # Vite dev server (entry: dev/main.ts)
+npm run dev          # Vite dev server (entry: docs/main.ts)
 npm run build        # Build library (vite + vite-plugin-dts with rollupTypes)
 npm run test         # Vitest (run all)
 npm run test -- <filter>   # Single test file (e.g., "useGeocoding")
-npm run lint        # ESLint (src/ dev/)
+npm run lint        # ESLint (src/ docs/)
 ```
 
 ESLint with Vue 3 + TypeScript rules (flat config in eslint.config.js).

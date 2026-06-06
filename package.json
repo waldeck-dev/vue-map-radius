@@ -26,10 +26,11 @@
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",
+        "docs:build": "vite build --config vite.docs.config.ts",
         "test": "vitest run",
         "test:watch": "vitest",
-        "lint": "eslint src/ dev/",
-        "lint:fix": "eslint src/ dev/ --fix"
+        "lint": "eslint src/ docs/",
+        "lint:fix": "eslint src/ docs/ --fix"
     },
     "dependencies": {
         "maplibre-gl": "^5.24.0",
