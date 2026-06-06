@@ -2,11 +2,11 @@ import MapRadius from './components/MapRadius.vue'
 export default MapRadius
 export type {
   Mode,
+  MapRadiusState,
   MapRadiusProps,
   SearchBarProps,
   ModeToggleProps,
   RadiusInputProps,
-  ConfirmButtonProps,
   MapContainerProps,
   GeocodingResult,
   TranslationMap,
@@ -14,7 +14,6 @@ export type {
   PolygonState,
   MapRadiusSearchOptions,
   MapRadiusRadiusOptions,
-  MapRadiusConfirmOptions,
   MapRadiusModeToggleOptions,
   MapRadiusMapOptions,
   MapRadiusGeoOptions,

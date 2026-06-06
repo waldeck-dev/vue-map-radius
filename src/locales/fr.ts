@@ -1,16 +1,13 @@
-const fr: Record<string, string> = {
-  'confirm.button': 'Confirmer le lieu',
-  'error.network': 'Erreur reseau. Veuillez reessayer.',
-  'error.noApiKey': 'La cle API MapTiler est requise',
-  'info.nonPolygon': "L'element selectionne n'est pas un polygone",
-  'info.noResults': 'Aucun resultat',
-  'mode.polygon': 'Polygone',
-  'mode.radius': 'Rayon',
-  'radius.label': 'Rayon (km)',
-  'radius.maxMessage': 'Le rayon maximum est {max} km',
-  'radius.minMessage': 'Le rayon minimum est {min} km',
+export default {
   'search.placeholder': 'Rechercher un lieu...',
-  'search.loading': 'Chargement...',
+  'search.loading': 'Recherche...',
+  'info.noResults': 'Aucun r\u00e9sultat trouv\u00e9',
+  'info.nonPolygon': 'Le lieu s\u00e9lectionn\u00e9 n\'est pas une zone polygonale',
+  'radius.label': 'Rayon (km)',
+  'radius.minMessage': 'Le rayon minimum est de {min} km',
+  'radius.maxMessage': 'Le rayon maximum est de {max} km',
+  'mode.radius': 'Rayon',
+  'mode.polygon': 'Polygone',
+  'error.noApiKey': 'La cl\u00e9 API MapTiler est requise',
+  'error.network': 'Erreur r\u00e9seau, veuillez r\u00e9essayer',
 }
-
-export default fr

@@ -1,16 +1,13 @@
-const en: Record<string, string> = {
-  'confirm.button': 'Confirm location',
-  'error.network': 'Network error. Please try again.',
-  'error.noApiKey': 'MapTiler API key is required',
-  'info.nonPolygon': 'Selected feature is not a polygon',
+export default {
+  'search.placeholder': 'Search for a location...',
+  'search.loading': 'Searching...',
   'info.noResults': 'No results found',
-  'mode.polygon': 'Polygon',
-  'mode.radius': 'Radius',
+  'info.nonPolygon': 'Selected location is not a polygon area',
   'radius.label': 'Radius (km)',
-  'radius.maxMessage': 'Maximum radius is {max} km',
   'radius.minMessage': 'Minimum radius is {min} km',
-  'search.placeholder': 'Search for a place...',
-  'search.loading': 'Loading...',
+  'radius.maxMessage': 'Maximum radius is {max} km',
+  'mode.radius': 'Radius',
+  'mode.polygon': 'Polygon',
+  'error.noApiKey': 'MapTiler API key is required',
+  'error.network': 'Network error, please try again',
 }
-
-export default en

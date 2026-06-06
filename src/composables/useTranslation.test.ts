@@ -4,7 +4,7 @@ import { useTranslation } from '../composables/useTranslation'
 describe('useTranslation', () => {
   it('should return English translation for known key', () => {
     const { t } = useTranslation('en')
-    expect(t('search.placeholder')).toBe('Search for a place...')
+    expect(t('search.placeholder')).toBe('Search for a location...')
   })
 
   it('should return French translation for known key', () => {
@@ -40,12 +40,12 @@ describe('useTranslation', () => {
     const { t } = useTranslation('en', {
       en: { 'custom.key': 'custom value' },
     })
-    expect(t('search.placeholder')).toBe('Search for a place...')
+    expect(t('search.placeholder')).toBe('Search for a location...')
     expect(t('custom.key')).toBe('custom value')
   })
 
   it('should fallback to built-in en for invalid locale', () => {
     const { t } = useTranslation('de')
-    expect(t('search.placeholder')).toBe('Search for a place...')
+    expect(t('search.placeholder')).toBe('Search for a location...')
   })
 })

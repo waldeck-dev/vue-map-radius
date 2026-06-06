@@ -26,7 +26,7 @@ export interface UseMapReturn {
   clearPolygon: () => void
   destroy: () => void
 
-  setCenterMarker: (lngLat: [number, number], opts?: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void }) => void
+  setCenterMarker: (lngLat: [number, number], opts?: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void }) => void
   updateCenterMarkerPosition: (lngLat: [number, number]) => void
   removeCenterMarker: () => void
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
-import type { Mode, GeocodingResult, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusConfirmOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions } from '../types'
+import type { Mode, GeocodingResult, MapRadiusState, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
 import { useGeocoding } from '../composables/useGeocoding'
 import { useRadius } from '../composables/useRadius'
@@ -9,12 +9,12 @@ import { circleToPolygon, toGeoJSON, haversineDistance, destinationPoint } from 
 import SearchBar from './subcomponents/VMPSearchBar.vue'
 import ModeToggle from './subcomponents/VMPModeToggle.vue'
 import RadiusInput from './subcomponents/VMPRadiusInput.vue'
-import ConfirmButton from './subcomponents/VMPConfirmButton.vue'
 import MapContainer from './subcomponents/VMPMapContainer.vue'
 import type { GeoJSON } from 'geojson'
 
 const props = withDefaults(defineProps<{
   apiKey: string
+  modelValue?: MapRadiusState
   center?: [number, number]
   zoom?: number
   minRadius?: number
@@ -27,7 +27,6 @@ const props = withDefaults(defineProps<{
   translations?: Record<string, Record<string, string>>
   searchOptions?: MapRadiusSearchOptions
   radiusOptions?: MapRadiusRadiusOptions
-  confirmOptions?: MapRadiusConfirmOptions
   modeToggleOptions?: MapRadiusModeToggleOptions
   mapOptions?: MapRadiusMapOptions
   geoOptions?: MapRadiusGeoOptions
@@ -48,7 +47,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  (e: 'confirm', feature: GeoJSON.Feature): void
+  (e: 'update:modelValue', state: MapRadiusState): void
 }>()
 
 const { t } = useTranslation(props.locale, props.translations)
@@ -66,9 +65,11 @@ const detailLoading = ref(false)
 
 const mapContainerRef = ref<InstanceType<typeof MapContainer>>()
 const errorMsg = ref<string | null>(null)
+const internalUpdating = ref(false)
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 let lastDragUpdate = 0
+
 function roundToStep(value: number, step: number): number {
   if (step <= 0) return value
   const precision = Math.max(0, Math.ceil(-Math.log10(step)))
@@ -76,18 +77,15 @@ function roundToStep(value: number, step: number): number {
   return Math.round(value * factor) / factor
 }
 
-// --- Interactive options ---
 const draggableCenter = computed(() => props.interactiveOptions?.draggableCenter ?? true)
 const draggableRadius = computed(() => props.interactiveOptions?.draggableRadius ?? true)
 const showRadiusTooltip = computed(() => props.interactiveOptions?.showRadiusTooltip ?? true)
 const hasInteractiveFeatures = computed(() => draggableCenter.value || draggableRadius.value)
 
-// --- Merged display strings (grouped prop > translation > built-in) ---
 const searchPlaceholder = computed(() => props.searchOptions?.placeholder ?? t('search.placeholder'))
 const searchNoResultsText = computed(() => props.searchOptions?.noResultsText ?? t('info.noResults'))
 const searchLoadingText = computed(() => props.searchOptions?.loadingText ?? t('search.loading'))
 const radiusLabel = computed(() => props.radiusOptions?.label ?? t('radius.label'))
-const confirmLabel = computed(() => props.confirmOptions?.label ?? t('confirm.button'))
 const modeRadiusLabel = computed(() => props.modeToggleOptions?.radiusLabel ?? t('mode.radius'))
 const modePolygonLabel = computed(() => props.modeToggleOptions?.polygonLabel ?? t('mode.polygon'))
 const mapStyleUrl = computed(() => props.mapOptions?.style)
@@ -121,10 +119,63 @@ watch(searchQuery, (val) => {
   }, 300)
 })
 
+function hydrate(state: MapRadiusState) {
+  activeMode.value = state.mode
+  errorMsg.value = null
+  searchResults.value = []
+
+  if (state.mode === 'radius') {
+    polygonFeature.value = null
+    polygonName.value = null
+    if (state.center) {
+      centerPoint.value = state.center
+      setCenter(state.center)
+    }
+    setRadius(state.radiusKm)
+  } else {
+    centerPoint.value = state.center || null
+    polygonFeature.value = state.polygon || null
+    polygonName.value = state.name || null
+  }
+
+  renderCurrentState()
+  searchQuery.value = state.name || ''
+}
+
+function emitState() {
+  if (internalUpdating.value) return
+  const state: MapRadiusState = {
+    mode: activeMode.value,
+    center: centerPoint.value,
+    radiusKm: radiusKm.value,
+    polygon: activeMode.value === 'radius' && centerPoint.value && radiusKm.value > 0
+      ? trimPrecision(toGeoJSON([circleToPolygon(centerPoint.value, radiusKm.value, props.radiusPolygonPoints)]))
+      : activeMode.value === 'polygon' && polygonFeature.value
+        ? trimPrecision(polygonFeature.value)
+        : null,
+    name: polygonName.value,
+  }
+  emit('update:modelValue', state)
+}
+
+watch(() => props.modelValue, (val) => {
+  if (!val) return
+  internalUpdating.value = true
+  hydrate(val)
+  nextTick(() => { internalUpdating.value = false })
+}, { deep: true, immediate: true })
+
+watch(() => mapContainerRef.value?.mapReady, (ready) => {
+  if (ready && props.modelValue) {
+    renderCurrentState()
+  }
+})
+
 async function onSelect(result: GeocodingResult) {
   searchQuery.value = result.text
   searchResults.value = []
   errorMsg.value = null
+  searchResults.value = []
 
   if (activeMode.value === 'radius') {
     centerPoint.value = result.center
@@ -132,6 +183,7 @@ async function onSelect(result: GeocodingResult) {
     mapContainerRef.value?.flyTo(result.center, 10)
     renderCircle()
     updateInteractiveMarkers()
+    emitState()
   } else {
     detailLoading.value = true
     try {
@@ -154,6 +206,7 @@ async function onSelect(result: GeocodingResult) {
       if (feature.bbox) {
         mapContainerRef.value?.fitBounds(feature.bbox)
       }
+      emitState()
     } catch {
       errorMsg.value = t('error.network')
     } finally {
@@ -170,6 +223,48 @@ function renderCircle() {
   const coords = circleToPolygon(centerPoint.value, radiusKm.value)
   mapContainerRef.value?.updateCircle(coords)
   mapContainerRef.value?.setVisibility('radius')
+}
+
+function getPolygonBounds(feature: GeoJSON.Feature): [number, number, number, number] | null {
+  if (!feature.geometry) return null
+  const coords: [number, number][] = []
+  const g = feature.geometry
+  if (g.type === 'Polygon') {
+    g.coordinates[0].forEach((c) => coords.push(c as [number, number]))
+  } else if (g.type === 'MultiPolygon') {
+    g.coordinates.forEach((poly) => poly[0].forEach((c) => coords.push(c as [number, number])))
+  } else {
+    return null
+  }
+  if (coords.length === 0) return null
+  let minLng = coords[0][0], minLat = coords[0][1], maxLng = coords[0][0], maxLat = coords[0][1]
+  for (let i = 1; i < coords.length; i++) {
+    if (coords[i][0] < minLng) minLng = coords[i][0]
+    if (coords[i][0] > maxLng) maxLng = coords[i][0]
+    if (coords[i][1] < minLat) minLat = coords[i][1]
+    if (coords[i][1] > maxLat) maxLat = coords[i][1]
+  }
+  return [minLng, minLat, maxLng, maxLat]
+}
+
+function renderCurrentState() {
+  if (!mapContainerRef.value?.mapReady) return
+  if (activeMode.value === 'radius') {
+    if (centerPoint.value && radiusKm.value > 0) {
+      renderCircle()
+      updateInteractiveMarkers()
+      mapContainerRef.value.flyTo(centerPoint.value, 10)
+    }
+  } else if (polygonFeature.value) {
+    mapContainerRef.value.updatePolygon(polygonFeature.value)
+    mapContainerRef.value.setVisibility('polygon')
+    const bbox = getPolygonBounds(polygonFeature.value)
+    if (bbox) {
+      mapContainerRef.value.fitBounds(bbox)
+    } else if (centerPoint.value) {
+      mapContainerRef.value.flyTo(centerPoint.value, 10)
+    }
+  }
 }
 
 function updateInteractiveMarkers() {
@@ -212,7 +307,7 @@ function updateInteractiveMarkers() {
   }
 
   if (showRadiusTooltip.value && draggableRadius.value) {
-    mc.setRadiusTooltip(`${roundToStep(radiusKm.value, props.radiusStep)} km`, handlePos)
+    mc.setRadiusTooltip(roundToStep(radiusKm.value, props.radiusStep) + ' km', handlePos)
   } else {
     mc.hideRadiusTooltip()
   }
@@ -223,6 +318,7 @@ function onCenterDragEnd(pos: [number, number]) {
   setCenter(pos)
   renderCircle()
   updateInteractiveMarkers()
+  emitState()
 }
 
 function onCenterDrag(pos: [number, number]) {
@@ -249,19 +345,17 @@ function onRadiusDragEnd(pos: [number, number]) {
   setRadius(roundToStep(clamped, props.radiusStep))
   renderCircle()
   updateInteractiveMarkers()
+  emitState()
 }
 
 function onRadiusDrag(pos: [number, number]) {
   if (!centerPoint.value) return
-
   const dist = haversineDistance(centerPoint.value, pos)
   const displayDist = roundToStep(dist, props.radiusStep)
-  mapContainerRef.value?.setRadiusTooltip(`${displayDist} km`, pos)
-
+  mapContainerRef.value?.setRadiusTooltip(displayDist + ' km', pos)
   const now = Date.now()
   if (now - lastDragUpdate < 50) return
   lastDragUpdate = now
-
   const clamped = Math.max(props.minRadius, Math.min(props.maxRadius, dist))
   const coords = circleToPolygon(centerPoint.value, clamped)
   mapContainerRef.value?.updateCircle(coords)
@@ -269,6 +363,7 @@ function onRadiusDrag(pos: [number, number]) {
 }
 
 watch(radiusKm, () => {
+  if (internalUpdating.value) return
   renderCircle()
   if (hasInteractiveFeatures.value) {
     nextTick(() => updateInteractiveMarkers())
@@ -279,6 +374,7 @@ watch(activeMode, (mode) => {
   searchResults.value = []
   searchQuery.value = ''
   errorMsg.value = null
+  searchResults.value = []
   if (mode === 'radius') {
     polygonFeature.value = null
     polygonName.value = null
@@ -295,6 +391,7 @@ watch(activeMode, (mode) => {
     mapContainerRef.value?.removeRadiusLine()
     mapContainerRef.value?.hideRadiusTooltip()
   }
+  if (!internalUpdating.value) emitState()
 })
 
 function onRadiusBlur() {
@@ -303,22 +400,7 @@ function onRadiusBlur() {
     radiusKm.value = roundToStep(radiusKm.value, props.radiusStep)
   }
   renderCircle()
-}
-
-const canConfirm = computed(() => {
-  if (activeMode.value === 'radius') {
-    return centerPoint.value !== null && radiusKm.value > 0
-  }
-  return polygonFeature.value !== null
-})
-
-function onConfirm() {
-  if (activeMode.value === 'radius' && centerPoint.value && radiusKm.value > 0) {
-    const coords = circleToPolygon(centerPoint.value, radiusKm.value, props.radiusPolygonPoints)
-    emit('confirm', trimPrecision(toGeoJSON([coords])))
-  } else if (activeMode.value === 'polygon' && polygonFeature.value) {
-    emit('confirm', trimPrecision(polygonFeature.value))
-  }
+  emitState()
 }
 
 const minMsg = computed(() => {
@@ -392,20 +474,6 @@ const maxMsg = computed(() => {
         @blur="onRadiusBlur"
       />
     </slot>
-    <slot
-      name="confirm-button"
-      :label="confirmLabel"
-      :on-confirm="onConfirm"
-      :loading="detailLoading"
-      :disabled="!canConfirm"
-    >
-      <ConfirmButton
-        :label="confirmLabel"
-        :loading="detailLoading"
-        :disabled="!canConfirm"
-        @confirm="onConfirm"
-      />
-    </slot>
     <div v-if="errorMsg" class="vmr-error-msg" role="alert">{{ errorMsg }}</div>
     <MapContainer
       ref="mapContainerRef"
@@ -430,6 +498,7 @@ const maxMsg = computed(() => {
   text-align: center;
 }
 </style>
+
 
 
 

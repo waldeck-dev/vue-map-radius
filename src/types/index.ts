@@ -2,6 +2,14 @@ import type { GeoJSON } from 'geojson'
 
 export type Mode = 'radius' | 'polygon'
 
+export interface MapRadiusState {
+  mode: Mode
+  center: [number, number] | null
+  radiusKm: number
+  polygon: GeoJSON.Feature | null
+  name: string | null
+}
+
 export interface MapRadiusProps {
   apiKey: string
   center?: [number, number]
@@ -35,12 +43,6 @@ export interface RadiusInputProps {
   label: string
   minMessage?: string
   maxMessage?: string
-}
-
-export interface ConfirmButtonProps {
-  label: string
-  loading?: boolean
-  disabled?: boolean
 }
 
 export interface MapContainerProps {
@@ -110,10 +112,6 @@ export interface MapRadiusSearchOptions {
 }
 
 export interface MapRadiusRadiusOptions {
-  label?: string
-}
-
-export interface MapRadiusConfirmOptions {
   label?: string
 }
 
