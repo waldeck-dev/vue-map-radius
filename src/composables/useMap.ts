@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue'
+﻿import { ref, onUnmounted } from 'vue'
 import type { Ref } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -61,8 +61,6 @@ export function useMap(
   let centerMarker: maplibregl.Marker | null = null
   let radiusHandle: maplibregl.Marker | null = null
   let radiusTooltip: maplibregl.Marker | null = null
-  let centerMarkerEl: HTMLDivElement | null = null
-  let radiusHandleEl: HTMLDivElement | null = null
   let radiusTooltipEl: HTMLDivElement | null = null
 
   function init() {
@@ -233,7 +231,6 @@ export function useMap(
     el.style.cursor = 'grab'
     el.style.pointerEvents = 'auto'
 
-    centerMarkerEl = el
     const draggable = opts?.draggable ?? true
 
     centerMarker = new maplibregl.Marker({ element: el, draggable })
@@ -264,7 +261,6 @@ export function useMap(
   function removeCenterMarker() {
     centerMarker?.remove()
     centerMarker = null
-    centerMarkerEl = null
   }
 
   // --- Radius handle ---
@@ -290,7 +286,6 @@ export function useMap(
     el.style.pointerEvents = 'auto'
     el.style.transition = 'transform 0.1s'
 
-    radiusHandleEl = el
     const draggable = opts?.draggable ?? true
 
     radiusHandle = new maplibregl.Marker({ element: el, draggable })
@@ -321,7 +316,6 @@ export function useMap(
   function removeRadiusHandle() {
     radiusHandle?.remove()
     radiusHandle = null
-    radiusHandleEl = null
   }
 
   // --- Radius line ---
@@ -435,3 +429,4 @@ function emptyLineString(): GeoJSON.Feature {
     },
   }
 }
+

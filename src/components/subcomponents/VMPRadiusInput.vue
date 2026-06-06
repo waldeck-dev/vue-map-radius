@@ -36,7 +36,10 @@ function onBlur() {
 
 <template>
   <div class="vmr-radius-input">
-    <label class="vmr-radius-label" for="vmr-radius-field">{{ label }}</label>
+    <label
+      class="vmr-radius-label"
+      for="vmr-radius-field"
+    >{{ label }}</label>
     <input
       id="vmr-radius-field"
       type="number"
@@ -47,8 +50,13 @@ function onBlur() {
       :aria-describedby="msgId"
       @input="onInput"
       @blur="onBlur"
-    />
-    <span v-if="msgId" :id="msgId" class="vmr-radius-message" role="alert">{{ minMessage || maxMessage }}</span>
+    >
+    <span
+      v-if="msgId"
+      :id="msgId"
+      class="vmr-radius-message"
+      role="alert"
+    >{{ minMessage || maxMessage }}</span>
   </div>
 </template>
 

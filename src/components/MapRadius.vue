@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
 import type { Mode, GeocodingResult, MapRadiusState, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
@@ -52,7 +52,7 @@ const emit = defineEmits<{
 
 const { t } = useTranslation(props.locale, props.translations)
 const { search: geocodeSearch, results: searchResults, loading: searchLoading, fetchFeatureDetail } = useGeocoding(props.apiKey)
-const { radiusKm, setRadius, clamp, validationMessage, center: radiusCenter, setCenter } = useRadius(props.minRadius, props.maxRadius)
+const { radiusKm, setRadius, clamp, validationMessage, setCenter } = useRadius(props.minRadius, props.maxRadius)
 const { trimPrecision, simplify } = useGeoJSON(props.geoOptions)
 
 const activeMode = ref<Mode>(props.mode)
@@ -411,7 +411,9 @@ const maxMsg = computed(() => {
 
 <template>
   <div class="vmr-map-radius">
-    <slot v-if="showModeToggle" name="mode-toggle"
+    <slot
+      v-if="showModeToggle"
+      name="mode-toggle"
       :mode="activeMode"
       :radius-label="modeRadiusLabel"
       :polygon-label="modePolygonLabel"
@@ -465,7 +467,13 @@ const maxMsg = computed(() => {
         @blur="onRadiusBlur"
       />
     </slot>
-    <div v-if="errorMsg" class="vmr-error-msg" role="alert">{{ errorMsg }}</div>
+    <div
+      v-if="errorMsg"
+      class="vmr-error-msg"
+      role="alert"
+    >
+      {{ errorMsg }}
+    </div>
     <MapContainer
       ref="mapContainerRef"
       :api-key="apiKey"
@@ -488,6 +496,7 @@ const maxMsg = computed(() => {
   text-align: center;
 }
 </style>
+
 
 
 

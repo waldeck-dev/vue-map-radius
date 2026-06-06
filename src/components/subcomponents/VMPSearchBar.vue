@@ -68,7 +68,12 @@ watch(() => props.modelValue, () => {
 </script>
 
 <template>
-  <div class="vmr-search-bar" role="combobox" :aria-expanded="showDropdown" aria-haspopup="listbox">
+  <div
+    class="vmr-search-bar"
+    role="combobox"
+    :aria-expanded="showDropdown"
+    aria-haspopup="listbox"
+  >
     <input
       :value="modelValue"
       :placeholder="placeholder"
@@ -82,7 +87,7 @@ watch(() => props.modelValue, () => {
       @focus="onFocus"
       @blur="onBlur"
       @keydown="onKeydown"
-    />
+    >
     <div
       v-if="showDropdown"
       id="vmr-search-results"
