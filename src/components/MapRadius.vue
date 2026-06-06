@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
 import type { Mode, GeocodingResult, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusConfirmOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
@@ -187,6 +187,7 @@ function updateInteractiveMarkers() {
     mc.setCenterMarker(centerPoint.value, {
       draggable: true,
       onDragEnd: onCenterDragEnd,
+      onDrag: onCenterDrag,
     })
   } else {
     mc.removeCenterMarker()
@@ -222,6 +223,19 @@ function onCenterDragEnd(pos: [number, number]) {
   setCenter(pos)
   renderCircle()
   updateInteractiveMarkers()
+}
+
+function onCenterDrag(pos: [number, number]) {
+  if (!centerPoint.value || radiusKm.value <= 0) return
+  centerPoint.value = pos
+  const now = Date.now()
+  if (now - lastDragUpdate < 50) return
+  lastDragUpdate = now
+  const coords = circleToPolygon(pos, radiusKm.value)
+  mapContainerRef.value?.updateCircle(coords)
+  const handlePos = destinationPoint(pos, radiusKm.value, handleBearing.value)
+  mapContainerRef.value?.updateRadiusHandlePosition(handlePos)
+  mapContainerRef.value?.setRadiusLine(pos, handlePos)
 }
 
 function onRadiusDragEnd(pos: [number, number]) {

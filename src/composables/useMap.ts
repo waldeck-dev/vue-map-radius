@@ -208,7 +208,7 @@ export function useMap(
 
   function setCenterMarker(
     lngLat: [number, number],
-    opts?: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void },
+    opts?: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void },
   ) {
     if (!map.value) return
     if (centerMarker) {
@@ -238,6 +238,14 @@ export function useMap(
       centerMarker.on('dragend', () => {
         const pos = centerMarker!.getLngLat()
         cb([pos.lng, pos.lat])
+      })
+    }
+
+    const dragCb = opts?.onDrag
+    if (draggable && dragCb) {
+      centerMarker.on('drag', () => {
+        const pos = centerMarker!.getLngLat()
+        dragCb([pos.lng, pos.lat])
       })
     }
   }
