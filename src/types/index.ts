@@ -9,6 +9,7 @@ export interface MapRadiusProps {
   minRadius?: number
   maxRadius?: number
   radiusStep?: number
+  radiusPolygonPoints?: number
   mode?: Mode
   height?: string
   locale?: string

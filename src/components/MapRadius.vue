@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
 import type { Mode, GeocodingResult, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusConfirmOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
@@ -20,6 +20,7 @@ const props = withDefaults(defineProps<{
   minRadius?: number
   maxRadius?: number
   radiusStep?: number
+  radiusPolygonPoints?: number
   mode?: Mode
   height?: string
   locale?: string
@@ -38,6 +39,7 @@ const props = withDefaults(defineProps<{
   minRadius: 0,
   maxRadius: Infinity,
   radiusStep: 1,
+  radiusPolygonPoints: 16,
   modes: () => ['radius', 'polygon'] as Mode[],
   mode: 'radius' as Mode,
   height: '500px',
@@ -298,7 +300,7 @@ const canConfirm = computed(() => {
 
 function onConfirm() {
   if (activeMode.value === 'radius' && centerPoint.value && radiusKm.value > 0) {
-    const coords = circleToPolygon(centerPoint.value, radiusKm.value)
+    const coords = circleToPolygon(centerPoint.value, radiusKm.value, props.radiusPolygonPoints)
     emit('confirm', trimPrecision(toGeoJSON([coords])))
   } else if (activeMode.value === 'polygon' && polygonFeature.value) {
     emit('confirm', trimPrecision(polygonFeature.value))
@@ -414,3 +416,6 @@ const maxMsg = computed(() => {
   text-align: center;
 }
 </style>
+
+
+
