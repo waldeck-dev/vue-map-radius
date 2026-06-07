@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
 import type { Mode, GeocodingResult, MapRadiusState, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
@@ -152,7 +152,7 @@ function emitState() {
     polygon: activeMode.value === 'radius' && centerPoint.value && radiusKm.value > 0
       ? trimPrecision(toGeoJSON([circleToPolygon(centerPoint.value, radiusKm.value, props.radiusPolygonPoints)]))
       : activeMode.value === 'polygon' && polygonFeature.value
-        ? trimPrecision(polygonFeature.value)
+        ? trimPrecision(simplify(polygonFeature.value, props.geoOptions?.simplifyTolerance ?? 0.01))
         : null,
     name: polygonName.value,
     bearing: handleBearing.value,
@@ -179,6 +179,7 @@ async function onSelect(result: GeocodingResult) {
   errorMsg.value = null
 
   if (activeMode.value === 'radius') {
+    polygonName.value = result.text
     centerPoint.value = result.center
     setCenter(result.center)
     mapContainerRef.value?.flyTo(result.center, 10)
@@ -199,7 +200,7 @@ async function onSelect(result: GeocodingResult) {
         errorMsg.value = t('info.nonPolygon')
         return
       }
-      polygonFeature.value = simplify(toGeoJSON(feature.geometry))
+      polygonFeature.value = toGeoJSON(feature.geometry)
       polygonName.value = feature.text
       mapContainerRef.value?.updatePolygon(polygonFeature.value!)
       mapContainerRef.value?.setVisibility('polygon')
@@ -251,7 +252,6 @@ function renderCurrentState() {
     if (centerPoint.value && radiusKm.value > 0) {
       renderCircle()
       updateInteractiveMarkers()
-      mapContainerRef.value.flyTo(centerPoint.value, 10)
     }
   } else if (polygonFeature.value) {
     mapContainerRef.value.updatePolygon(polygonFeature.value)
