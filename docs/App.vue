@@ -8,7 +8,7 @@ const apiKey = import.meta.env.VITE_MAPTILER_KEY
 const state = ref<MapRadiusState>({
   mode: 'radius',
   center: null,
-  radiusKm: 0,
+  radiusKm: 20,
   polygon: null,
   name: null
 })
