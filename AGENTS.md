@@ -1,6 +1,6 @@
 # vue-map-radius
 
-**Pre-implementation spec.** SPEC.md — authoritative design doc (Vue 3 + Composition API, TypeScript, MapLibre GL JS, MapTiler, Vite, Vitest). `.env` requires `MAPTILER_KEY`; copy `.env.example` to `.env`.
+**Pre-implementation spec.** SPEC.md — authoritative design doc (Vue 3 + Composition API, TypeScript, MapLibre GL JS, MapTiler, Vite, Vitest). `.env` requires `VITE_MAPTILER_KEY`; copy `.env.example` to `.env`.
 
 ## Commands
 

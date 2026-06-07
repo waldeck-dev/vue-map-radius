@@ -16,7 +16,7 @@ I built this over a weekend because my team needed a map radius/polygon picker �
 - **v-model support** — full state management via `MapRadiusState`
 - **TypeScript** — full type definitions included
 - **Geocoding** — powered by MapTiler Geocoding API
-- **Lightweight** — only 29 kB (JS) + 72 kB (CSS) gzipped
+- **Lightweight** — only 8.7 kB (JS) + 10.7 kB (CSS) gzipped
 
 ## Installation
 
@@ -150,7 +150,7 @@ Bug reports and feature requests are welcome via [GitHub Issues](https://github.
 
 ```bash
 # Copy environment file
-cp .env.example .env   # add your MAPTILER_KEY
+cp .env.example .env   # add your VITE_MAPTILER_KEY
 
 # Start dev server
 npm run dev
