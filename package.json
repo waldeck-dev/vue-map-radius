@@ -20,7 +20,8 @@
                 "types": "./dist/src/index.d.ts",
                 "default": "./dist/vue-map-radius.umd.cjs"
             }
-        }
+        },
+        "./dist/vue-map-radius.css": "./dist/vue-map-radius.css"
     },
     "scripts": {
         "dev": "vite",
