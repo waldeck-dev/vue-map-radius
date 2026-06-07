@@ -150,7 +150,7 @@ Bug reports and feature requests are welcome via [GitHub Issues](https://github.
 
 ```bash
 # Copy environment file
-cp .env.example .env   # add your VITE_MAPTILER_KEY
+cp .env.example .env   # add your MAPTILER_KEY
 
 # Start dev server
 npm run dev

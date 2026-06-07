@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import MapRadius from '../src/components/MapRadius.vue'
 import type { MapRadiusState } from '../src/types'
 
-const apiKey = import.meta.env.VITE_MAPTILER_KEY
+const apiKey = import.meta.env.MAPTILER_KEY
 
 const state = ref<MapRadiusState>({
   mode: 'radius',
