@@ -107,6 +107,8 @@ In addition to the default component export (`MapRadius`), the package exports:
 
 ### Composables
 
+Each composable can also be imported and used independently of the `MapRadius` component.
+
 | Composable | Return | Description |
 |------------|--------|-------------|
 | `useGeoJSON` | `{ trimPrecision, simplify }` | Coordinate precision trimming and polygon simplification |
