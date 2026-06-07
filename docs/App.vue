@@ -18,7 +18,7 @@ const stateJson = computed(() => JSON.stringify(state.value, null, 2))
 const center: [number, number] = [2.2137, 46.2276]
 const zoom = 5
 
-const githubMarkSrc = '/github-mark.svg'
+const githubMarkSrc = `${import.meta.env.BASE_URL}github-mark.svg`
 </script>
 
 <template>
