@@ -35,7 +35,7 @@ const zoom = 5
       </div>
       <a
         class="demo-gh"
-        href="https://github.com/anomalyco/map-radius"
+        href="https://github.com/waldeck-dev/vue-map-radius"
         target="_blank"
         title="GitHub"
       >

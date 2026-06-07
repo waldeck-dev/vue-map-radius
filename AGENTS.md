@@ -10,6 +10,8 @@ npm run build        # Build library (vite + vite-plugin-dts with rollupTypes)
 npm run test         # Vitest (run all)
 npm run test -- <filter>   # Single test file (e.g., "useGeocoding")
 npm run lint        # ESLint (src/ docs/)
+
+npm run typecheck   # vue-tsc --noEmit
 ```
 
 ESLint with Vue 3 + TypeScript rules (flat config in eslint.config.js).
