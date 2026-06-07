@@ -3,8 +3,8 @@ import vue from '@vitejs/plugin-vue'
 import dts from 'vite-plugin-dts'
 import { resolve } from 'path'
 
-export default defineConfig({
-  publicDir: false,
+export default defineConfig(({ command }) => ({
+  publicDir: command === 'serve' ? 'public' : false,
   plugins: [vue(), dts({
     tsconfigPath: resolve(__dirname, 'tsconfig.app.json'),
     skipDiagnostics: true,
@@ -39,4 +39,4 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
   },
-})
+}))
