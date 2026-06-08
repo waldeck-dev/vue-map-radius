@@ -112,7 +112,7 @@ const githubMarkSrc = `${import.meta.env.BASE_URL}github-mark.svg`
 
     <footer class="demo-footer">
       <span>Vue 3 + MapLibre GL JS + MapTiler</span>
-      <span>v0.1.0</span>
+      <span>v1.0.0</span>
     </footer>
   </div>
 </template>
