@@ -6,7 +6,7 @@
 
 ```
 npm run dev          # Vite dev server (entry: docs/main.ts)
-npm run build        # Build library (vite + vite-plugin-dts with rollupTypes)
+npm run build        # Build library (vite + vite-plugin-dts w/ cleanVueFileName + staticImport)
 npm run test         # Vitest (run all)
 npm run test -- <filter>   # Single test file (e.g., "useGeocoding")
 npm run lint        # ESLint (src/ docs/)
@@ -51,5 +51,5 @@ ESLint with Vue 3 + TypeScript rules (flat config in eslint.config.js).
 ## Bundle
 
 - `vue` and `maplibre-gl` are external peer dependencies (not bundled)
-- `vite-plugin-dts` with `rollupTypes: true` rolls all types into a single `dist/src/index.d.ts`
+- `vite-plugin-dts` generates individual `.d.ts` files mirroring `src/` (v5 renamed `rollupTypes` → `bundleTypes` but it requires `@microsoft/api-extractor` and doesn't work well with Vue SFC types; `cleanVueFileName` + `staticImport` are used instead)
 - Entry: `src/index.ts` — exports component as default + types + geo utils + `useGeoJSON`

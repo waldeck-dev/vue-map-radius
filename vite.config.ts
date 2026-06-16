@@ -10,8 +10,9 @@ export default defineConfig(({ command }) => ({
     skipDiagnostics: true,
     entryRoot: resolve(__dirname, 'src'),
     outDir: resolve(__dirname, 'dist'),
-    exclude: ['**/*.test.ts', '**/docs/**'],
-    rollupTypes: true,
+    exclude: ['**/*.test.ts', '**/docs/**', '**/vite-env.d.ts'],
+    cleanVueFileName: true,
+    staticImport: true,
   })],
   resolve: {
     alias: {
