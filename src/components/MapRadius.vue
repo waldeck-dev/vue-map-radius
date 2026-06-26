@@ -252,6 +252,7 @@ function renderCurrentState() {
     if (centerPoint.value && radiusKm.value > 0) {
       renderCircle()
       updateInteractiveMarkers()
+      mapContainerRef.value.fitBounds(circleBounds(centerPoint.value, radiusKm.value))
     }
   } else if (polygonFeature.value) {
     mapContainerRef.value.updatePolygon(polygonFeature.value)
@@ -359,6 +360,9 @@ function onRadiusDrag(pos: [number, number]) {
 watch(radiusKm, () => {
   if (internalUpdating.value) return
   renderCircle()
+  if (centerPoint.value && radiusKm.value > 0) {
+    mapContainerRef.value?.fitBounds(circleBounds(centerPoint.value, radiusKm.value))
+  }
   if (draggableRadius.value) {
     nextTick(() => updateInteractiveMarkers())
   }
@@ -375,6 +379,7 @@ watch(activeMode, (mode) => {
     if (centerPoint.value && radiusKm.value > 0) {
       renderCircle()
       updateInteractiveMarkers()
+      mapContainerRef.value?.fitBounds(circleBounds(centerPoint.value, radiusKm.value))
     }
   } else {
     centerPoint.value = null
