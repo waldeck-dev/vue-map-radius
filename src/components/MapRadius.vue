@@ -107,6 +107,7 @@ if (!props.apiKey) {
 }
 
 watch(searchQuery, (val) => {
+  if (internalUpdating.value) return
   if (searchTimeout) clearTimeout(searchTimeout)
   if (val.length < 2) {
     searchResults.value = []
