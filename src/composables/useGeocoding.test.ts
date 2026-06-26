@@ -23,6 +23,18 @@ describe('useGeocoding', () => {
     expect(url).toContain('key=test-key-123')
     expect(url).toContain('autocomplete=true')
     expect(url).toContain('limit=5')
+    expect(url).toContain('language=en')
+  })
+
+  it('uses provided locale in search URL', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ type: 'FeatureCollection', features: [], query: ['london'] })
+    })
+    const { search } = useGeocoding(API_KEY, 'fr')
+    await search('london', 'radius')
+    const url = mockFetch.mock.calls[0][0]
+    expect(url).toContain('language=fr')
   })
 
   it('includes type filter for polygon mode', async () => {

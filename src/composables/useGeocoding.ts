@@ -17,7 +17,7 @@ function mapFeature(f: MapTilerFeature): GeocodingResult {
   }
 }
 
-export function useGeocoding(apiKey: string) {
+export function useGeocoding(apiKey: string, locale = 'en') {
   const results = ref<GeocodingResult[]>([])
   const error = ref<string | null>(null)
   const loading = ref(false)
@@ -35,7 +35,7 @@ export function useGeocoding(apiKey: string) {
       const params = new URLSearchParams({
         key: apiKey,
         autocomplete: 'true',
-        language: 'en',
+        language: locale,
         limit: '5',
       })
 
@@ -59,7 +59,7 @@ export function useGeocoding(apiKey: string) {
   }
 
   async function fetchFeatureDetail(id: string): Promise<GeocodingResult | null> {
-    const params = new URLSearchParams({ key: apiKey })
+    const params = new URLSearchParams({ key: apiKey, language: locale })
     const response = await fetch(`${BASE_URL}/${encodeURIComponent(id)}.json?${params}`)
     if (!response.ok) {
       throw new Error(`Geocoding detail API error: ${response.status}`)

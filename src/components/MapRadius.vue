@@ -51,7 +51,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useTranslation(props.locale, props.translations)
-const { search: geocodeSearch, results: searchResults, loading: searchLoading, fetchFeatureDetail } = useGeocoding(props.apiKey)
+const { search: geocodeSearch, results: searchResults, loading: searchLoading, fetchFeatureDetail } = useGeocoding(props.apiKey, props.locale)
 const { radiusKm, setRadius, clamp, validationMessage, setCenter } = useRadius(props.minRadius, props.maxRadius)
 const { trimPrecision, simplify } = useGeoJSON(props.geoOptions)
 
