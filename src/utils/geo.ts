@@ -21,6 +21,7 @@ export function circleToPolygon(
     coordinates.push([newLng, newLat])
   }
 
+  coordinates.push([coordinates[0][0], coordinates[0][1]])
   return coordinates
 }
 
