@@ -1,6 +1,6 @@
 import type { GeoJSON } from 'geojson'
 import { describe, it, expect } from 'vitest'
-import { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint, circleBounds } from '../utils/geo'
+import { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint, circleBounds, getPolygonBounds } from '../utils/geo'
 
 describe('circleToPolygon', () => {
   it('should return 64 points plus closing point by default', () => {
@@ -253,6 +253,42 @@ describe('destinationPoint', () => {
     const dest = destinationPoint(origin, dist, 45)
     const roundTrip = haversineDistance(origin, dest)
     expect(roundTrip).toBeCloseTo(dist, 0)
+  })
+})
+
+describe('getPolygonBounds', () => {
+  it('returns null for null geometry', () => {
+    const feature: GeoJSON.Feature = { type: 'Feature', properties: {}, geometry: null }
+    expect(getPolygonBounds(feature)).toBeNull()
+  })
+
+  it('returns null for Point geometry', () => {
+    const feature: GeoJSON.Feature = { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [1, 2] } }
+    expect(getPolygonBounds(feature)).toBeNull()
+  })
+
+  it('computes bbox for a Polygon', () => {
+    const feature: GeoJSON.Feature = {
+      type: 'Feature', properties: {},
+      geometry: { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] },
+    }
+    expect(getPolygonBounds(feature)).toEqual([0, 0, 10, 10])
+  })
+
+  it('computes bbox for a MultiPolygon', () => {
+    const feature: GeoJSON.Feature = {
+      type: 'Feature', properties: {},
+      geometry: { type: 'MultiPolygon', coordinates: [[[[0, 0], [5, 0], [5, 5], [0, 5], [0, 0]]], [[[10, 10], [15, 10], [15, 15], [10, 15], [10, 10]]]] },
+    }
+    expect(getPolygonBounds(feature)).toEqual([0, 0, 15, 15])
+  })
+
+  it('returns null for empty coordinates', () => {
+    const feature: GeoJSON.Feature = {
+      type: 'Feature', properties: {},
+      geometry: { type: 'Polygon', coordinates: [[]] },
+    }
+    expect(getPolygonBounds(feature)).toBeNull()
   })
 })
 

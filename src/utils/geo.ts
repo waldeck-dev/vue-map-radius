@@ -207,6 +207,28 @@ export function destinationPoint(
   return [(newLngRad * 180) / Math.PI, (newLatRad * 180) / Math.PI]
 }
 
+export function getPolygonBounds(feature: GeoJSON.Feature): [number, number, number, number] | null {
+  if (!feature.geometry) return null
+  const coords: [number, number][] = []
+  const g = feature.geometry
+  if (g.type === 'Polygon') {
+    g.coordinates[0].forEach((c) => coords.push(c as [number, number]))
+  } else if (g.type === 'MultiPolygon') {
+    g.coordinates.forEach((poly) => poly[0].forEach((c) => coords.push(c as [number, number])))
+  } else {
+    return null
+  }
+  if (coords.length === 0) return null
+  let minLng = coords[0][0], minLat = coords[0][1], maxLng = coords[0][0], maxLat = coords[0][1]
+  for (let i = 1; i < coords.length; i++) {
+    if (coords[i][0] < minLng) minLng = coords[i][0]
+    if (coords[i][0] > maxLng) maxLng = coords[i][0]
+    if (coords[i][1] < minLat) minLat = coords[i][1]
+    if (coords[i][1] > maxLat) maxLat = coords[i][1]
+  }
+  return [minLng, minLat, maxLng, maxLat]
+}
+
 export function circleBounds(
   center: [number, number],
   radiusKm: number,
