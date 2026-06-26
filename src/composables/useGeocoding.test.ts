@@ -124,6 +124,15 @@ describe('useGeocoding', () => {
     expect(url).toContain('/geocoding/123.json')
   })
 
+  it('fetchFeatureDetail throws with API status on error', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404
+    })
+    const { fetchFeatureDetail } = useGeocoding(API_KEY)
+    await expect(fetchFeatureDetail('123')).rejects.toThrow('404')
+  })
+
   it('sets loading state during search', async () => {
     let resolvePromise!: (value: unknown) => void
     const promise = new Promise(resolve => { resolvePromise = resolve })

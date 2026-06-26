@@ -208,8 +208,8 @@ async function onSelect(result: GeocodingResult) {
         mapContainerRef.value?.fitBounds(feature.bbox)
       }
       emitState()
-    } catch {
-      errorMsg.value = t('error.network')
+    } catch (err) {
+      errorMsg.value = err instanceof Error ? err.message : t('error.network')
     }
   }
 }
