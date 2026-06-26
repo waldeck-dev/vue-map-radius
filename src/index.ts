@@ -11,7 +11,7 @@ export type {
   MapRadiusGeoOptions,
   MapRadiusInteractiveOptions,
 } from './types'
-export { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint } from './utils/geo'
+export { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint, circleBounds } from './utils/geo'
 export { useGeoJSON } from './composables/useGeoJSON'
 export { useGeocoding } from './composables/useGeocoding'
 export { useTranslation } from './composables/useTranslation'

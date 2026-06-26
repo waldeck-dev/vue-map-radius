@@ -205,3 +205,14 @@ export function destinationPoint(
     )
   return [(newLngRad * 180) / Math.PI, (newLatRad * 180) / Math.PI]
 }
+
+export function circleBounds(
+  center: [number, number],
+  radiusKm: number,
+): [number, number, number, number] {
+  const n = destinationPoint(center, radiusKm, 0)
+  const e = destinationPoint(center, radiusKm, 90)
+  const s = destinationPoint(center, radiusKm, 180)
+  const w = destinationPoint(center, radiusKm, 270)
+  return [w[0], s[1], e[0], n[1]]
+}

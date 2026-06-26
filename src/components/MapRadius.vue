@@ -5,7 +5,7 @@ import { useTranslation } from '../composables/useTranslation'
 import { useGeocoding } from '../composables/useGeocoding'
 import { useRadius } from '../composables/useRadius'
 import { useGeoJSON } from '../composables/useGeoJSON'
-import { circleToPolygon, toGeoJSON, haversineDistance, destinationPoint } from '../utils/geo'
+import { circleToPolygon, toGeoJSON, haversineDistance, destinationPoint, circleBounds } from '../utils/geo'
 import SearchBar from './subcomponents/VMPSearchBar.vue'
 import ModeToggle from './subcomponents/VMPModeToggle.vue'
 import RadiusInput from './subcomponents/VMPRadiusInput.vue'
@@ -182,7 +182,7 @@ async function onSelect(result: GeocodingResult) {
     polygonName.value = result.text
     centerPoint.value = result.center
     setCenter(result.center)
-    mapContainerRef.value?.flyTo(result.center, 10)
+    mapContainerRef.value?.fitBounds(circleBounds(result.center, radiusKm.value))
     renderCircle()
     updateInteractiveMarkers()
     emitState()

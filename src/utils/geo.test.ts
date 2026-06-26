@@ -1,6 +1,6 @@
 import type { GeoJSON } from 'geojson'
 import { describe, it, expect } from 'vitest'
-import { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint } from '../utils/geo'
+import { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint, circleBounds } from '../utils/geo'
 
 describe('circleToPolygon', () => {
   it('should return 64 points by default', () => {
@@ -256,5 +256,36 @@ describe('destinationPoint', () => {
     const dest = destinationPoint(origin, dist, 45)
     const roundTrip = haversineDistance(origin, dest)
     expect(roundTrip).toBeCloseTo(dist, 0)
+  })
+})
+
+describe('circleBounds', () => {
+  it('returns a point bbox for zero radius', () => {
+    const bbox = circleBounds([2.35, 48.85], 0)
+    expect(bbox[0]).toBeCloseTo(2.35, 8)
+    expect(bbox[1]).toBeCloseTo(48.85, 8)
+    expect(bbox[2]).toBeCloseTo(2.35, 8)
+    expect(bbox[3]).toBeCloseTo(48.85, 8)
+  })
+
+  it('north-south span equals 2× radius in degrees at equator', () => {
+    const bbox = circleBounds([0, 0], 111.32)
+    expect(bbox[3] - bbox[1]).toBeCloseTo(2, 0)
+  })
+
+  it('north edge is at radius distance from center', () => {
+    const center: [number, number] = [10, 30]
+    const radius = 500
+    const bbox = circleBounds(center, radius)
+    const north: [number, number] = [center[0], bbox[3]]
+    expect(haversineDistance(center, north)).toBeCloseTo(radius, -1)
+  })
+
+  it('bbox contains the center', () => {
+    const bbox = circleBounds([2.35, 48.85], 100)
+    expect(bbox[0]).toBeLessThan(2.35)
+    expect(bbox[1]).toBeLessThan(48.85)
+    expect(bbox[2]).toBeGreaterThan(2.35)
+    expect(bbox[3]).toBeGreaterThan(48.85)
   })
 })
