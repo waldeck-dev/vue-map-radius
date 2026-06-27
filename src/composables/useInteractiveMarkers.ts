@@ -138,8 +138,6 @@ export function useInteractiveMarkers(
     const dist = haversineDistance(centerPoint.value, pos)
     const clamped = Math.max(opts.minRadius, Math.min(opts.maxRadius, dist))
     callbacks.setRadius(roundToStep(clamped, opts.radiusStep))
-    renderCircle()
-    updateInteractiveMarkers()
     callbacks.emitState()
   }
 
@@ -160,7 +158,6 @@ export function useInteractiveMarkers(
   function onRadiusBlur() {
     callbacks.clamp()
     callbacks.setRadius(roundToStep(radiusKm.value, opts.radiusStep))
-    renderCircle()
     callbacks.emitState()
   }
 
