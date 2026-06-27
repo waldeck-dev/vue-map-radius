@@ -106,6 +106,7 @@ const {
     setRadius,
     clamp,
     emitState,
+    clearName,
   },
 )
 
@@ -137,7 +138,7 @@ function hydrate(state: MapRadiusState) {
 
   if (state.mode === 'radius') {
     polygonFeature.value = null
-    polygonName.value = null
+    polygonName.value = state.name || null
     if (state.center) {
       centerPoint.value = state.center
       setCenter(state.center)
@@ -154,6 +155,11 @@ function hydrate(state: MapRadiusState) {
 
   renderCurrentState()
   searchQuery.value = state.name || ''
+}
+
+function clearName() {
+  polygonName.value = null
+  searchQuery.value = ''
 }
 
 function emitState() {

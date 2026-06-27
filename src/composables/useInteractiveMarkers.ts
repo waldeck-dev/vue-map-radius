@@ -8,6 +8,7 @@ export interface InteractiveMarkerCallbacks {
   setRadius: (val: number) => void
   clamp: () => void
   emitState: () => void
+  clearName?: () => void
 }
 
 export interface InteractiveMarkerOptions {
@@ -111,6 +112,7 @@ export function useInteractiveMarkers(
   function onCenterDragEnd(pos: [number, number]) {
     centerPoint.value = pos
     callbacks.setCenter(pos)
+    callbacks.clearName?.()
     renderCircle()
     updateInteractiveMarkers()
     callbacks.emitState()
