@@ -7,7 +7,11 @@ export default defineConfig(({ command }) => ({
   publicDir: command === 'serve' ? 'public' : false,
   plugins: [vue(), dts({
     tsconfigPath: resolve(__dirname, 'tsconfig.app.json'),
-    skipDiagnostics: true,
+    clean: true,
+    tsBuildInfoFile: resolve(__dirname, 'node_modules/.tmp/tsbuildinfo'),
+    compilerOptions: {
+      skipLibCheck: true,
+    },
     entryRoot: resolve(__dirname, 'src'),
     outDir: resolve(__dirname, 'dist'),
     exclude: ['**/*.test.ts', '**/docs/**', '**/vite-env.d.ts'],
