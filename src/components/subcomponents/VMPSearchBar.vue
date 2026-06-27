@@ -116,7 +116,7 @@ watch(() => props.modelValue, () => {
         role="option"
         :aria-label="result.placeName"
         :aria-selected="idx === activeIndex"
-        @mousedown.prevent="onSelect(result)"
+        @click="onSelect(result)"
       >
         <span class="vmr-search-result-text">{{ result.text }}</span>
         <span class="vmr-search-result-place">{{ result.placeName }}</span>
