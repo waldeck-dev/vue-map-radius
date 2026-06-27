@@ -1,5 +1,10 @@
 import { ref, computed } from 'vue'
 
+export type ValidationMessage =
+  | { key: 'radius.minMessage'; params: { min: number } }
+  | { key: 'radius.maxMessage'; params: { max: number } }
+  | null
+
 export function useRadius(minRadius: number, maxRadius: number) {
   const radiusKm = ref<number>(10)
   const center = ref<[number, number] | null>(null)
@@ -8,7 +13,7 @@ export function useRadius(minRadius: number, maxRadius: number) {
     return Math.max(minRadius, Math.min(maxRadius, radiusKm.value))
   })
 
-  const validationMessage = computed(() => {
+  const validationMessage = computed<ValidationMessage>(() => {
     if (radiusKm.value < minRadius) {
       return { key: 'radius.minMessage', params: { min: minRadius } }
     }

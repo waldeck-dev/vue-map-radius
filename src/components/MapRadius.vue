@@ -92,7 +92,7 @@ const {
   {
     minRadius: props.minRadius,
     maxRadius: props.maxRadius,
-    radiusStep: props.radiusStep,
+    radiusStep: Math.max(1, props.radiusStep),
     draggableCenter: draggableCenter.value,
     draggableRadius: draggableRadius.value,
     showRadiusTooltip: showRadiusTooltip.value,
@@ -283,13 +283,13 @@ watch(activeMode, (mode) => {
 
 const minMsg = computed(() => {
   const v = validationMessage.value
-  if (v && v.key === 'radius.minMessage') return t(v.key, v.params as unknown as Record<string, string | number>)
+  if (v && v.key === 'radius.minMessage') return t(v.key, v.params)
   return undefined
 })
 
 const maxMsg = computed(() => {
   const v = validationMessage.value
-  if (v && v.key === 'radius.maxMessage') return t(v.key, v.params as unknown as Record<string, string | number>)
+  if (v && v.key === 'radius.maxMessage') return t(v.key, v.params)
   return undefined
 })
 </script>
