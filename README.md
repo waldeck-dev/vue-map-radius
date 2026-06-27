@@ -42,7 +42,7 @@ const state = ref({
   center: [2.3522, 48.8566], // lng, lat
   zoom: 10,
   mode: "radius",
-  radius: 5000,
+  radiusKm: 5,
 })
 </script>
 
@@ -85,9 +85,22 @@ interface MapRadiusState {
 | `apiKey` | `string` | — | MapTiler API key **(required)** |
 | `modes` | `Mode[]` | `["radius", "polygon"]` | Available modes |
 | `mode` | `Mode` | — | Active mode (overrides default) |
-| `radiusStep` | `number` | `1000` | Step for radius input (meters) |
+| `radiusStep` | `number` | `1` | Step for radius input (km) |
 | `interactiveOptions` | `Partial<MapRadiusInteractiveOptions>` | — | Override interactive layer paint/layout |
 | `geoOptions` | `Partial<MapRadiusGeoOptions>` | — | Override simplification / precision settings |
+| `center` | `[number, number]` | `[0, 20]` | Initial map center `[lng, lat]` |
+| `zoom` | `number` | `2` | Initial map zoom level |
+| `minRadius` | `number` | `0` | Minimum circle radius (km) |
+| `maxRadius` | `number` | `Infinity` | Maximum circle radius (km) |
+| `radiusPolygonPoints` | `number` | `16` | Number of points used to approximate the circle polygon |
+| `height` | `string` | `'500px'` | Map container height |
+| `locale` | `string` | `'en'` | UI language (`'en'` or `'fr'`) |
+| `translations` | `Record<string, Record<string, string>>` | `{}` | Custom translation overrides per locale |
+| `searchOptions` | `Partial<MapRadiusSearchOptions>` | — | Search bar UI text customization |
+| `radiusOptions` | `Partial<MapRadiusRadiusOptions>` | — | Radius input label customization |
+| `modeToggleOptions` | `Partial<MapRadiusModeToggleOptions>` | — | Mode toggle button labels |
+| `mapOptions` | `Partial<MapRadiusMapOptions>` | — | Map style URL override |
+| `paintOptions` | `Partial<MapRadiusPaintOptions>` | — | Map layer paint style overrides |
 
 ## Exports
 
@@ -104,6 +117,8 @@ In addition to the default component export (`MapRadius`), the package exports:
 | `simplifyPolygon` | Applies RDP simplification to a Polygon/MultiPolygon Feature |
 | `haversineDistance` | Returns the great-circle distance (km) between two coordinates |
 | `destinationPoint` | Calculates destination coordinate given origin, distance, and bearing |
+| `circleBounds` | Returns the bounding box `[w, s, e, n]` of a circle given center and radius |
+| `getPolygonBounds` | Returns the bounding box `[w, s, e, n]` of a GeoJSON polygon feature |
 
 ### Composables
 
@@ -131,6 +146,7 @@ Each composable can also be imported and used independently of the `MapRadius` c
 | `MapRadiusMapOptions` | Map style URL override |
 | `MapRadiusGeoOptions` | Coordinate precision and simplification tolerance settings |
 | `MapRadiusInteractiveOptions` | Interaction feature toggles (draggableCenter, draggableRadius, showRadiusTooltip) |
+| `MapRadiusPaintOptions` | Map layer paint style overrides (circleColor, circleOpacity, polygonColor, etc.) |
 
 ### Slots
 
