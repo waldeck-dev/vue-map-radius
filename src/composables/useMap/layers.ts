@@ -3,6 +3,7 @@ import type { Ref } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoJSON } from 'geojson'
+import type { MapRadiusPaintOptions } from '../../types'
 
 const CIRCLE_SOURCE = 'vmr-circle-source'
 const CIRCLE_FILL_LAYER = 'vmr-circle-fill'
@@ -27,6 +28,7 @@ export function useMapLayers(
   center: [number, number],
   zoom: number,
   styleUrl?: string,
+  paintOptions?: MapRadiusPaintOptions,
 ) {
   const mapReady = ref(false)
 
@@ -40,23 +42,34 @@ export function useMapLayers(
       zoom,
     })
 
+    const circleColor = paintOptions?.circleColor ?? 'rgba(59, 130, 246, 0.2)'
+    const circleOutlineColor = paintOptions?.circleOutlineColor ?? '#3b82f6'
+    const circleOutlineWidth = paintOptions?.circleOutlineWidth ?? 2
+    const polygonColor = paintOptions?.polygonColor ?? 'rgba(34, 197, 94, 0.2)'
+    const polygonOutlineColor = paintOptions?.polygonOutlineColor ?? '#22c55e'
+    const polygonOutlineWidth = paintOptions?.polygonOutlineWidth ?? 2
+
+    const circleFillPaint: Record<string, unknown> = { 'fill-color': circleColor }
+    if (paintOptions?.circleOpacity != null) circleFillPaint['fill-opacity'] = paintOptions.circleOpacity
+
+    const polygonFillPaint: Record<string, unknown> = { 'fill-color': polygonColor }
+    if (paintOptions?.polygonOpacity != null) polygonFillPaint['fill-opacity'] = paintOptions.polygonOpacity
+
     instance.on('load', () => {
       instance.addSource(CIRCLE_SOURCE, { type: 'geojson', data: emptyFeature() })
       instance.addLayer({
         id: CIRCLE_FILL_LAYER,
         type: 'fill',
         source: CIRCLE_SOURCE,
-        paint: {
-          'fill-color': 'rgba(59, 130, 246, 0.2)',
-        },
+        paint: circleFillPaint,
       })
       instance.addLayer({
         id: CIRCLE_LINE_LAYER,
         type: 'line',
         source: CIRCLE_SOURCE,
         paint: {
-          'line-color': '#3b82f6',
-          'line-width': 2,
+          'line-color': circleOutlineColor,
+          'line-width': circleOutlineWidth,
         },
       })
 
@@ -65,17 +78,15 @@ export function useMapLayers(
         id: POLYGON_FILL_LAYER,
         type: 'fill',
         source: POLYGON_SOURCE,
-        paint: {
-          'fill-color': 'rgba(34, 197, 94, 0.2)',
-        },
+        paint: polygonFillPaint,
       })
       instance.addLayer({
         id: POLYGON_LINE_LAYER,
         type: 'line',
         source: POLYGON_SOURCE,
         paint: {
-          'line-color': '#22c55e',
-          'line-width': 2,
+          'line-color': polygonOutlineColor,
+          'line-width': polygonOutlineWidth,
         },
       })
 
@@ -85,7 +96,7 @@ export function useMapLayers(
         type: 'line',
         source: RADIUS_LINE_SOURCE,
         paint: {
-          'line-color': '#3b82f6',
+          'line-color': circleOutlineColor,
           'line-width': 1.5,
           'line-dasharray': [3, 3],
         },

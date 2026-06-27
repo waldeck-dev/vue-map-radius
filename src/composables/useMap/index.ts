@@ -4,6 +4,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMapLayers, buildStyleUrl } from './layers'
 import { useMapMarkers } from './markers'
+import type { MapRadiusPaintOptions } from '../../types'
 
 export { buildStyleUrl }
 
@@ -41,6 +42,7 @@ export function useMap(
   center: [number, number],
   zoom: number,
   styleUrl?: string,
+  paintOptions?: MapRadiusPaintOptions,
 ): UseMapReturn {
   const map = ref<maplibregl.Map | null>(null) as Ref<maplibregl.Map | null>
 
@@ -55,7 +57,7 @@ export function useMap(
     fitBounds,
     flyTo,
     destroyMap,
-  } = useMapLayers(map, containerId, apiKey, center, zoom, styleUrl)
+  } = useMapLayers(map, containerId, apiKey, center, zoom, styleUrl, paintOptions)
 
   const {
     setCenterMarker,
@@ -70,7 +72,7 @@ export function useMap(
     hideRadiusTooltip,
     setMarkersVisibility,
     destroyMarkers,
-  } = useMapMarkers(map)
+  } = useMapMarkers(map, paintOptions)
 
   function setVisibility(mode: 'radius' | 'polygon') {
     setLayersVisibility(mode)

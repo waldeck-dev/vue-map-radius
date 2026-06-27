@@ -9,6 +9,7 @@ export type {
   MapRadiusModeToggleOptions,
   MapRadiusMapOptions,
   MapRadiusGeoOptions,
+  MapRadiusPaintOptions,
   MapRadiusInteractiveOptions,
 } from './types'
 export { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint, circleBounds, getPolygonBounds } from './utils/geo'

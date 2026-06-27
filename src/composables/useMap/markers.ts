@@ -1,8 +1,9 @@
 import type { Ref } from 'vue'
 import maplibregl from 'maplibre-gl'
 import type { GeoJSON } from 'geojson'
+import type { MapRadiusPaintOptions } from '../../types'
 
-export function useMapMarkers(map: Ref<maplibregl.Map | null>) {
+export function useMapMarkers(map: Ref<maplibregl.Map | null>, paintOptions?: MapRadiusPaintOptions) {
   let centerMarker: maplibregl.Marker | null = null
   let radiusHandle: maplibregl.Marker | null = null
   let radiusTooltip: maplibregl.Marker | null = null
@@ -24,7 +25,7 @@ export function useMapMarkers(map: Ref<maplibregl.Map | null>) {
     el.style.width = '20px'
     el.style.height = '20px'
     el.style.borderRadius = '50%'
-    el.style.background = '#3b82f6'
+    el.style.background = paintOptions?.centerMarkerColor ?? '#3b82f6'
     el.style.border = '3px solid #fff'
     el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)'
     el.style.cursor = 'grab'
@@ -78,7 +79,7 @@ export function useMapMarkers(map: Ref<maplibregl.Map | null>) {
     el.style.width = '16px'
     el.style.height = '16px'
     el.style.borderRadius = '50%'
-    el.style.border = '3px solid #3b82f6'
+    el.style.border = '3px solid ' + (paintOptions?.radiusHandleColor ?? '#3b82f6')
     el.style.background = 'transparent'
     el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)'
     el.style.cursor = 'ew-resize'
@@ -154,7 +155,7 @@ export function useMapMarkers(map: Ref<maplibregl.Map | null>) {
     el.className = 'vmr-radius-tooltip'
     el.textContent = text
     el.style.background = '#fff'
-    el.style.color = '#3b82f6'
+    el.style.color = paintOptions?.radiusTooltipColor ?? '#3b82f6'
     el.style.fontSize = '11px'
     el.style.fontWeight = '600'
     el.style.padding = '2px 6px'

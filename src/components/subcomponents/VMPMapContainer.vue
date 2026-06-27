@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useMap } from '../../composables/useMap'
+import type { MapRadiusPaintOptions } from '../../types'
 
 const props = defineProps<{
   apiKey: string
@@ -8,6 +9,7 @@ const props = defineProps<{
   zoom: number
   height: string
   mapStyle?: string
+  paintOptions?: MapRadiusPaintOptions
 }>()
 
 const containerId = 'vmr-map-' + Math.random().toString(36).slice(2, 8)
@@ -38,7 +40,7 @@ const {
 
   setRadiusTooltip,
   hideRadiusTooltip,
-} = useMap(containerId, props.apiKey, props.center, props.zoom, props.mapStyle)
+} = useMap(containerId, props.apiKey, props.center, props.zoom, props.mapStyle, props.paintOptions)
 
 onMounted(() => {
   init()

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
 import type { Ref } from 'vue'
-import type { Mode, GeocodingResult, MapRadiusState, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions } from '../types'
+import type { Mode, GeocodingResult, MapRadiusState, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions, MapRadiusPaintOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
 import { useGeocoding } from '../composables/useGeocoding'
 import { useRadius } from '../composables/useRadius'
@@ -33,6 +33,7 @@ const props = withDefaults(defineProps<{
   modeToggleOptions?: MapRadiusModeToggleOptions
   mapOptions?: MapRadiusMapOptions
   geoOptions?: MapRadiusGeoOptions
+  paintOptions?: MapRadiusPaintOptions
   modes?: Mode[]
   interactiveOptions?: MapRadiusInteractiveOptions
 }>(), {
@@ -366,6 +367,7 @@ const maxMsg = computed(() => {
       :zoom="zoom"
       :height="height"
       :map-style="mapStyleUrl"
+      :paint-options="paintOptions"
     />
   </div>
 </template>

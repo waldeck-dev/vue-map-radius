@@ -64,6 +64,20 @@ export interface MapRadiusGeoOptions {
   simplifyTolerance?: number
 }
 
+export interface MapRadiusPaintOptions {
+  circleColor?: string
+  circleOpacity?: number
+  circleOutlineColor?: string
+  circleOutlineWidth?: number
+  polygonColor?: string
+  polygonOpacity?: number
+  polygonOutlineColor?: string
+  polygonOutlineWidth?: number
+  centerMarkerColor?: string
+  radiusHandleColor?: string
+  radiusTooltipColor?: string
+}
+
 export interface MapRadiusInteractiveOptions {
   draggableCenter?: boolean
   draggableRadius?: boolean
