@@ -207,7 +207,11 @@ export function destinationPoint(
   return [(newLngRad * 180) / Math.PI, (newLatRad * 180) / Math.PI]
 }
 
+const polygonBoundsCache = new WeakMap<GeoJSON.Feature, [number, number, number, number]>()
+
 export function getPolygonBounds(feature: GeoJSON.Feature): [number, number, number, number] | null {
+  const cached = polygonBoundsCache.get(feature)
+  if (cached) return cached
   if (!feature.geometry) return null
   const coords: [number, number][] = []
   const g = feature.geometry
@@ -226,7 +230,9 @@ export function getPolygonBounds(feature: GeoJSON.Feature): [number, number, num
     if (coords[i][1] < minLat) minLat = coords[i][1]
     if (coords[i][1] > maxLat) maxLat = coords[i][1]
   }
-  return [minLng, minLat, maxLng, maxLat]
+  const result: [number, number, number, number] = [minLng, minLat, maxLng, maxLat]
+  polygonBoundsCache.set(feature, result)
+  return result
 }
 
 export function circleBounds(
