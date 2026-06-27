@@ -321,4 +321,37 @@ describe('circleBounds', () => {
     expect(bbox[2]).toBeGreaterThan(2.35)
     expect(bbox[3]).toBeGreaterThan(48.85)
   })
+
+  it('wraps longitude when crossing the anti-meridian eastward', () => {
+    const bbox = circleBounds([179, 0], 500)
+    expect(bbox[0]).toBeCloseTo(174.5, 0)
+    expect(bbox[2]).toBeCloseTo(-176.5, 0)
+    expect(bbox[0]).toBeGreaterThan(bbox[2])
+  })
+
+  it('wraps longitude when crossing the anti-meridian westward', () => {
+    const bbox = circleBounds([-179, 0], 500)
+    expect(bbox[0]).toBeCloseTo(176.5, 0)
+    expect(bbox[2]).toBeCloseTo(-174.5, 0)
+    expect(bbox[0]).toBeGreaterThan(bbox[2])
+  })
+
+  it('does not wrap for circles not crossing the anti-meridian', () => {
+    const bbox = circleBounds([0, 0], 500)
+    expect(bbox[0]).toBeLessThan(bbox[2])
+  })
+
+  it('returns a point bbox for zero radius at the anti-meridian', () => {
+    const bbox = circleBounds([179, 0], 0)
+    expect(bbox[0]).toBeCloseTo(179, 8)
+    expect(bbox[2]).toBeCloseTo(179, 8)
+  })
+
+  it('keeps all longitudes within [-180, 180]', () => {
+    const bbox = circleBounds([179, 0], 2000)
+    expect(bbox[0]).toBeGreaterThanOrEqual(-180)
+    expect(bbox[0]).toBeLessThanOrEqual(180)
+    expect(bbox[2]).toBeGreaterThanOrEqual(-180)
+    expect(bbox[2]).toBeLessThanOrEqual(180)
+  })
 })

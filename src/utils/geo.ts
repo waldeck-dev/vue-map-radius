@@ -243,5 +243,11 @@ export function circleBounds(
   const e = destinationPoint(center, radiusKm, 90)
   const s = destinationPoint(center, radiusKm, 180)
   const w = destinationPoint(center, radiusKm, 270)
-  return [w[0], s[1], e[0], n[1]]
+
+  const wrap = (lng: number) => {
+    const r = lng % 360
+    return r > 180 ? r - 360 : r < -180 ? r + 360 : r
+  }
+
+  return [wrap(w[0]), s[1], wrap(e[0]), n[1]]
 }
