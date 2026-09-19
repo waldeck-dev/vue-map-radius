@@ -22,6 +22,7 @@ export type {
   MapRadiusInteractiveOptions,
   MapRadiusZoneListOptions,
 } from './types'
+export type { SplitOutlyingPartsOptions, SplitOutlyingPartsResult } from './utils/geo'
 
 /** Convert a center point + radius into a polygon vertex array. */
 export { circleToPolygon } from './utils/geo'
@@ -43,6 +44,8 @@ export { circleBounds } from './utils/geo'
 export { getPolygonBounds } from './utils/geo'
 /** Combine multiple Polygon/MultiPolygon geometries into one MultiPolygon Feature. */
 export { mergeToMultiPolygon } from './utils/geo'
+/** Split a country/region's geometry into its main landmass and far, small outlying parts. */
+export { splitOutlyingParts } from './utils/geo'
 
 /** Coordinate precision trimming and polygon simplification. */
 export { useGeoJSON } from './composables/useGeoJSON'

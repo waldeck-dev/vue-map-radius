@@ -71,6 +71,12 @@ export interface MapRadiusMapOptions {
 export interface MapRadiusGeoOptions {
   coordPrecision?: number
   simplifyTolerance?: number
+  /** Automatically split a selected zone's far, small parts (e.g. overseas territories) into their own zones. Default: true. */
+  splitOutlyingTerritories?: boolean
+  /** Minimum distance (km) from the main landmass for a part to be considered outlying. Default: 400. */
+  outlyingDistanceKm?: number
+  /** A part must be smaller than this fraction of the main landmass's area to be split off. Default: 0.25. */
+  outlyingSizeRatio?: number
 }
 
 export interface MapRadiusPaintOptions {

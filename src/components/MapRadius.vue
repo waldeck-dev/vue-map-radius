@@ -6,7 +6,7 @@ import { useTranslation } from '../composables/useTranslation'
 import { useGeocoding } from '../composables/useGeocoding'
 import { useRadius } from '../composables/useRadius'
 import { useGeoJSON } from '../composables/useGeoJSON'
-import { circleToPolygon, toGeoJSON, circleBounds, getPolygonBounds, mergeToMultiPolygon } from '../utils/geo'
+import { circleToPolygon, toGeoJSON, circleBounds, getPolygonBounds, mergeToMultiPolygon, splitOutlyingParts } from '../utils/geo'
 import { useInteractiveMarkers } from '../composables/useInteractiveMarkers'
 import type { MapContainerApi } from '../composables/useInteractiveMarkers'
 import SearchBar from './subcomponents/VMPSearchBar.vue'
@@ -302,7 +302,15 @@ async function onSelect(result: GeocodingResult) {
         errorMsg.value = t('info.nonPolygon')
         return
       }
-      zones.value = [...zones.value, { id: result.id, name: feature.text, geometry: feature.geometry, color: nextZoneColor(zones.value.length) }]
+      const splitEnabled = props.geoOptions?.splitOutlyingTerritories ?? true
+      const mainGeometry = splitEnabled
+        ? splitOutlyingParts(feature.geometry, {
+          distanceKm: props.geoOptions?.outlyingDistanceKm,
+          sizeRatio: props.geoOptions?.outlyingSizeRatio,
+        }).main
+        : feature.geometry
+
+      zones.value = [...zones.value, { id: result.id, name: feature.text, geometry: mainGeometry, color: nextZoneColor(zones.value.length) }]
       searchQuery.value = ''
       mapContainerRef.value?.updatePolygon(zoneFeatureCollection.value)
       mapContainerRef.value?.setVisibility('polygon')

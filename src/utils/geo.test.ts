@@ -1,6 +1,6 @@
 import type { GeoJSON } from 'geojson'
 import { describe, it, expect } from 'vitest'
-import { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint, circleBounds, getPolygonBounds, mergeToMultiPolygon } from '../utils/geo'
+import { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint, circleBounds, getPolygonBounds, mergeToMultiPolygon, splitOutlyingParts } from '../utils/geo'
 
 describe('circleToPolygon', () => {
   it('should return 64 points plus closing point by default', () => {
@@ -346,6 +346,102 @@ describe('mergeToMultiPolygon', () => {
     const geom = result?.geometry as GeoJSON.MultiPolygon
     expect(geom.coordinates).toHaveLength(1)
     expect(geom.coordinates[0]).toEqual(polygonA.coordinates)
+  })
+})
+
+describe('splitOutlyingParts', () => {
+  function square(lng: number, lat: number, size: number): GeoJSON.Polygon {
+    return {
+      type: 'Polygon',
+      coordinates: [[[lng, lat], [lng + size, lat], [lng + size, lat + size], [lng, lat + size], [lng, lat]]],
+    }
+  }
+  function multi(...polygons: GeoJSON.Polygon[]): GeoJSON.MultiPolygon {
+    return { type: 'MultiPolygon', coordinates: polygons.map((p) => p.coordinates) }
+  }
+
+  const main = square(0, 0, 10) // large landmass
+  const nearTiny = square(6, 6, 1) // small, ~235km from main's center -> stays merged by default
+  const farTiny = square(100, 5, 0.5) // small, ~10000km away -> splits off
+  const farTinyNeighbor = square(100.6, 5, 0.5) // small, far from main, close to farTiny -> clusters with it
+  const farTinyIsolated = square(-100, 5, 0.5) // small, far from main and farTiny -> its own outlier
+  const farBig = square(100, 0, 10) // same size as main, far away -> stays merged (not "small")
+  const farMedium = square(100, 5, 4) // 40% of main's side length, but only ~16% of its area -> splits off
+
+  it('returns the geometry unchanged for a single Polygon', () => {
+    const result = splitOutlyingParts(main)
+    expect(result.main).toEqual(main)
+    expect(result.outliers).toEqual([])
+  })
+
+  it('returns the geometry unchanged for a MultiPolygon with a single part', () => {
+    const geometry = multi(main)
+    const result = splitOutlyingParts(geometry)
+    expect(result.main).toEqual(geometry)
+    expect(result.outliers).toEqual([])
+  })
+
+  it('merges a small part near the main landmass instead of splitting it off', () => {
+    const geometry = multi(main, nearTiny)
+    const result = splitOutlyingParts(geometry)
+    expect(result.outliers).toEqual([])
+    const mainGeom = result.main as GeoJSON.MultiPolygon
+    expect(mainGeom.type).toBe('MultiPolygon')
+    expect(mainGeom.coordinates).toHaveLength(2)
+  })
+
+  it('splits off a small, far part as its own outlier', () => {
+    const geometry = multi(main, farTiny)
+    const result = splitOutlyingParts(geometry)
+    expect(result.main).toEqual(main)
+    expect(result.outliers).toHaveLength(1)
+    expect(result.outliers[0]).toEqual(farTiny)
+  })
+
+  it('clusters nearby far parts into a single outlier', () => {
+    const geometry = multi(main, farTiny, farTinyNeighbor)
+    const result = splitOutlyingParts(geometry)
+    expect(result.outliers).toHaveLength(1)
+    const outlier = result.outliers[0] as GeoJSON.MultiPolygon
+    expect(outlier.type).toBe('MultiPolygon')
+    expect(outlier.coordinates).toHaveLength(2)
+  })
+
+  it('keeps distant far parts as separate outliers', () => {
+    const geometry = multi(main, farTiny, farTinyIsolated)
+    const result = splitOutlyingParts(geometry)
+    expect(result.outliers).toHaveLength(2)
+  })
+
+  it('splits off a far part based on area, not bounding-box diagonal', () => {
+    // A naive linear-size comparison would see 4/10 = 40% and keep this merged;
+    // by area it's 16/100 = 16%, correctly below the default 25% ratio.
+    const geometry = multi(main, farMedium)
+    const result = splitOutlyingParts(geometry)
+    expect(result.main).toEqual(main)
+    expect(result.outliers).toHaveLength(1)
+    expect(result.outliers[0]).toEqual(farMedium)
+  })
+
+  it('does not split off a far part that is comparable in size to the main landmass', () => {
+    const geometry = multi(main, farBig)
+    const result = splitOutlyingParts(geometry)
+    expect(result.outliers).toEqual([])
+    const mainGeom = result.main as GeoJSON.MultiPolygon
+    expect(mainGeom.coordinates).toHaveLength(2)
+  })
+
+  it('respects a custom distanceKm option', () => {
+    const geometry = multi(main, nearTiny)
+    const result = splitOutlyingParts(geometry, { distanceKm: 50 })
+    expect(result.outliers).toHaveLength(1)
+    expect(result.outliers[0]).toEqual(nearTiny)
+  })
+
+  it('respects a custom sizeRatio option', () => {
+    const geometry = multi(main, farBig)
+    const result = splitOutlyingParts(geometry, { sizeRatio: 1.5 })
+    expect(result.outliers).toHaveLength(1)
   })
 })
 

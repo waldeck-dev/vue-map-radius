@@ -71,6 +71,133 @@ export function mergeToMultiPolygon(
   }
 }
 
+export interface SplitOutlyingPartsOptions {
+  /** Minimum distance (km) from the main landmass for a part to be considered outlying. */
+  distanceKm?: number
+  /** A part must be smaller than this fraction of the main landmass's area to be split off. */
+  sizeRatio?: number
+}
+
+export interface SplitOutlyingPartsResult {
+  main: GeoJSON.Geometry
+  outliers: GeoJSON.Geometry[]
+}
+
+interface PolygonPart {
+  polygon: GeoJSON.Polygon
+  center: [number, number]
+  /** Approximate area in km², used to compare a part's size to the main landmass. */
+  size: number
+}
+
+// Shoelace formula on an equirectangular projection local to the ring's latitude.
+// Good enough to compare landmass sizes; not a precise geodesic area.
+function ringAreaKm2(ring: GeoJSON.Position[], refLat: number): number {
+  const kmPerDegLat = 111.32
+  const kmPerDegLng = 111.32 * Math.cos((refLat * Math.PI) / 180)
+  let sum = 0
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [lng1, lat1] = ring[i]
+    const [lng2, lat2] = ring[i + 1]
+    sum += (lng1 * kmPerDegLng) * (lat2 * kmPerDegLat) - (lng2 * kmPerDegLng) * (lat1 * kmPerDegLat)
+  }
+  return Math.abs(sum) / 2
+}
+
+function polygonAreaKm2(polygon: GeoJSON.Polygon): number {
+  const rings = polygon.coordinates
+  if (rings.length === 0 || rings[0].length === 0) return 0
+  const refLat = rings[0][0][1]
+  const outer = ringAreaKm2(rings[0], refLat)
+  const holes = rings.slice(1).reduce((sum, hole) => sum + ringAreaKm2(hole, refLat), 0)
+  return Math.max(outer - holes, 0)
+}
+
+function toPart(coordinates: GeoJSON.Position[][]): PolygonPart {
+  const polygon: GeoJSON.Polygon = { type: 'Polygon', coordinates }
+  const bbox = getPolygonBounds(toGeoJSON(polygon))
+  const center: [number, number] = bbox
+    ? [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
+    : ((coordinates[0]?.[0] as [number, number]) ?? [0, 0])
+  const size = polygonAreaKm2(polygon)
+  return { polygon, center, size }
+}
+
+function toPartGeometry(parts: PolygonPart[]): GeoJSON.Geometry {
+  if (parts.length === 1) return parts[0].polygon
+  return { type: 'MultiPolygon', coordinates: parts.map((p) => p.polygon.coordinates) }
+}
+
+function clusterByDistance(indices: number[], parts: PolygonPart[], thresholdKm: number): number[][] {
+  const visited = new Set<number>()
+  const clusters: number[][] = []
+  for (const start of indices) {
+    if (visited.has(start)) continue
+    const stack = [start]
+    const cluster: number[] = []
+    visited.add(start)
+    while (stack.length > 0) {
+      const current = stack.pop()!
+      cluster.push(current)
+      for (const other of indices) {
+        if (!visited.has(other) && haversineDistance(parts[current].center, parts[other].center) <= thresholdKm) {
+          visited.add(other)
+          stack.push(other)
+        }
+      }
+    }
+    clusters.push(cluster)
+  }
+  return clusters
+}
+
+/**
+ * Splits a country/region's geometry into its main landmass and any small,
+ * far-away parts (e.g. overseas territories, distant islands), so callers
+ * can treat those as independent zones instead of one merged shape.
+ * A part is only split off when it is BOTH far from the main landmass AND
+ * much smaller than it — this keeps naturally scattered archipelagos
+ * (e.g. Indonesia, Philippines) as a single "main" geometry.
+ */
+export function splitOutlyingParts(
+  geometry: GeoJSON.Geometry,
+  options: SplitOutlyingPartsOptions = {},
+): SplitOutlyingPartsResult {
+  const distanceKm = options.distanceKm ?? 400
+  const sizeRatio = options.sizeRatio ?? 0.25
+
+  if (geometry.type !== 'MultiPolygon' || geometry.coordinates.length <= 1) {
+    return { main: geometry, outliers: [] }
+  }
+
+  const parts = geometry.coordinates.map(toPart)
+
+  let mainIndex = 0
+  for (let i = 1; i < parts.length; i++) {
+    if (parts[i].size > parts[mainIndex].size) mainIndex = i
+  }
+  const main = parts[mainIndex]
+
+  const nearIndices = [mainIndex]
+  const farIndices: number[] = []
+  parts.forEach((part, i) => {
+    if (i === mainIndex) return
+    const isSmall = part.size < main.size * sizeRatio
+    const isFar = haversineDistance(part.center, main.center) > distanceKm
+    if (isSmall && isFar) {
+      farIndices.push(i)
+    } else {
+      nearIndices.push(i)
+    }
+  })
+
+  const mainGeometry = toPartGeometry(nearIndices.map((i) => parts[i]))
+  const outliers = clusterByDistance(farIndices, parts, distanceKm)
+    .map((indices) => toPartGeometry(indices.map((i) => parts[i])))
+
+  return { main: mainGeometry, outliers }
+}
+
 function trimCoords(value: unknown, decimals: number): unknown {
   if (typeof value === 'number') {
     return Number(value.toFixed(decimals))
