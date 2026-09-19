@@ -16,6 +16,29 @@ import ZoneList from './subcomponents/VMPZoneList.vue'
 import MapContainer from './subcomponents/VMPMapContainer.vue'
 import type { GeoJSON } from 'geojson'
 
+const DEFAULT_ZONE_COLORS = [
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#22c55e', // green
+  '#f59e0b', // amber
+  '#a855f7', // purple
+  '#06b6d4', // cyan
+  '#ec4899', // pink
+  '#84cc16', // lime
+]
+
+function hexToRgba(hex: string, alpha: number): string {
+  const normalized = hex.replace('#', '')
+  const full = normalized.length === 3
+    ? normalized.split('').map((c) => c + c).join('')
+    : normalized
+  const value = parseInt(full, 16)
+  const r = (value >> 16) & 255
+  const g = (value >> 8) & 255
+  const b = value & 255
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 const props = withDefaults(defineProps<{
   apiKey: string
   modelValue?: MapRadiusState
@@ -66,19 +89,44 @@ const searchQuery = ref('')
 const centerPoint = ref<[number, number] | null>(null)
 const zones = ref<MapRadiusZone[]>([])
 const simplifyTolerance = computed(() => props.geoOptions?.simplifyTolerance ?? 0.025)
-const polygonFeature = computed<GeoJSON.Feature | null>(() => {
-  const merged = mergeToMultiPolygon(zones.value.map((z) => z.geometry))
-  if (!merged) return null
-  return trimPrecision(simplify(merged, simplifyTolerance.value))
-})
+const zoneColors = computed(() => props.paintOptions?.zoneColors?.length ? props.paintOptions.zoneColors : DEFAULT_ZONE_COLORS)
+function nextZoneColor(index: number): string {
+  return zoneColors.value[index % zoneColors.value.length]
+}
+// Simplifying a country-sized polygon is the expensive part of adding a zone.
+// Cache the result per raw geometry so unrelated zones aren't re-simplified
+// every time the zones array changes (e.g. when another zone is added/removed).
+const zoneGeometryCache = new WeakMap<GeoJSON.Geometry, { tolerance: number; geometry: GeoJSON.Geometry }>()
+function getSimplifiedZoneGeometry(geometry: GeoJSON.Geometry, tolerance: number): GeoJSON.Geometry {
+  const cached = zoneGeometryCache.get(geometry)
+  if (cached && cached.tolerance === tolerance) return cached.geometry
+  const simplified = trimPrecision(simplify(toGeoJSON(geometry), tolerance).geometry!)
+  zoneGeometryCache.set(geometry, { tolerance, geometry: simplified })
+  return simplified
+}
+const polygonFeature = computed<GeoJSON.Feature | null>(() =>
+  mergeToMultiPolygon(zones.value.map((z) => getSimplifiedZoneGeometry(z.geometry, simplifyTolerance.value))),
+)
 function toOutputZone(zone: MapRadiusZone): MapRadiusZone {
-  const simplified = simplify(toGeoJSON(zone.geometry), simplifyTolerance.value)
   return {
     id: zone.id,
     name: zone.name,
-    geometry: trimPrecision(simplified.geometry!),
+    color: zone.color,
+    geometry: getSimplifiedZoneGeometry(zone.geometry, simplifyTolerance.value),
   }
 }
+function zoneToFeature(zone: MapRadiusZone): GeoJSON.Feature {
+  const color = zone.color ?? DEFAULT_ZONE_COLORS[0]
+  return {
+    type: 'Feature',
+    properties: { id: zone.id, color, fillColor: hexToRgba(color, 0.3) },
+    geometry: getSimplifiedZoneGeometry(zone.geometry, simplifyTolerance.value),
+  }
+}
+const zoneFeatureCollection = computed<GeoJSON.FeatureCollection>(() => ({
+  type: 'FeatureCollection',
+  features: zones.value.map(zoneToFeature),
+}))
 const zonesName = computed<string | null>(() =>
   zones.value.length ? zones.value.map((z) => z.name).join(', ') : null,
 )
@@ -87,6 +135,7 @@ const polygonName = ref<string | null>(null)
 const mapContainerRef = ref<InstanceType<typeof MapContainer> | null>(null)
 const errorMsg = ref<string | null>(null)
 const internalUpdating = ref(false)
+const zoneLoading = ref(false)
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -103,6 +152,7 @@ const modePolygonLabel = computed(() => props.modeToggleOptions?.polygonLabel ??
 const mapStyleUrl = computed(() => props.mapOptions?.style)
 const showModeToggle = computed(() => props.modes.length > 1)
 const zoneRemoveLabel = computed(() => props.zoneListOptions?.removeLabel ?? t('zone.remove'))
+const zoneLoadingLabel = computed(() => props.zoneListOptions?.loadingLabel ?? t('zone.loading'))
 
 const visibleSearchResults = computed(() =>
   activeMode.value === 'polygon'
@@ -175,7 +225,9 @@ function hydrate(state: MapRadiusState) {
     }
   } else {
     centerPoint.value = state.center || null
-    zones.value = state.zones ? state.zones.map((z) => ({ ...z })) : []
+    zones.value = state.zones
+      ? state.zones.map((z, i) => ({ ...z, color: z.color ?? nextZoneColor(i) }))
+      : []
   }
 
   renderCurrentState()
@@ -236,6 +288,7 @@ async function onSelect(result: GeocodingResult) {
       searchQuery.value = ''
       return
     }
+    zoneLoading.value = true
     try {
       const feature = await fetchFeatureDetail(result.id)
       if (!feature || !feature.geometry) {
@@ -249,9 +302,9 @@ async function onSelect(result: GeocodingResult) {
         errorMsg.value = t('info.nonPolygon')
         return
       }
-      zones.value = [...zones.value, { id: result.id, name: feature.text, geometry: feature.geometry }]
+      zones.value = [...zones.value, { id: result.id, name: feature.text, geometry: feature.geometry, color: nextZoneColor(zones.value.length) }]
       searchQuery.value = ''
-      mapContainerRef.value?.updatePolygon(polygonFeature.value!)
+      mapContainerRef.value?.updatePolygon(zoneFeatureCollection.value)
       mapContainerRef.value?.setVisibility('polygon')
       const bbox = getPolygonBounds(polygonFeature.value!) ?? (feature.bbox as [number, number, number, number] | undefined)
       if (bbox) {
@@ -260,6 +313,8 @@ async function onSelect(result: GeocodingResult) {
       emitState()
     } catch (err) {
       errorMsg.value = err instanceof Error ? err.message : t('error.network')
+    } finally {
+      zoneLoading.value = false
     }
   }
 }
@@ -270,7 +325,7 @@ function removeZone(id: string) {
   if (zones.value.length === 0) {
     mapContainerRef.value?.clearPolygon()
   } else {
-    mapContainerRef.value?.updatePolygon(polygonFeature.value!)
+    mapContainerRef.value?.updatePolygon(zoneFeatureCollection.value)
     const bbox = getPolygonBounds(polygonFeature.value!)
     if (bbox) {
       mapContainerRef.value?.fitBounds(bbox)
@@ -288,7 +343,7 @@ function renderCurrentState() {
       mapContainerRef.value?.fitBounds(circleBounds(centerPoint.value, radiusKm.value))
     }
   } else if (polygonFeature.value) {
-    mapContainerRef.value?.updatePolygon(polygonFeature.value)
+    mapContainerRef.value?.updatePolygon(zoneFeatureCollection.value)
     mapContainerRef.value?.setVisibility('polygon')
     const bbox = getPolygonBounds(polygonFeature.value)
     if (bbox) {
@@ -355,12 +410,14 @@ const maxMsg = computed(() => {
       :mode="activeMode"
       :radius-label="modeRadiusLabel"
       :polygon-label="modePolygonLabel"
+      :disabled="zoneLoading"
       :switch-mode="(m: Mode) => activeMode = m"
     >
       <ModeToggle
         :mode="activeMode"
         :radius-label="modeRadiusLabel"
         :polygon-label="modePolygonLabel"
+        :disabled="zoneLoading"
         @update:mode="activeMode = $event"
       />
     </slot>
@@ -370,6 +427,7 @@ const maxMsg = computed(() => {
       :placeholder="searchPlaceholder"
       :results="visibleSearchResults"
       :loading="searchLoading"
+      :disabled="zoneLoading"
       :update-query="(val: string) => searchQuery = val"
       :on-select="onSelect"
     >
@@ -380,18 +438,29 @@ const maxMsg = computed(() => {
         :loading="searchLoading"
         :no-results-text="searchNoResultsText"
         :loading-text="searchLoadingText"
+        :disabled="zoneLoading"
         @update:model-value="searchQuery = $event"
         @select="onSelect"
       />
     </slot>
+    <div
+      v-if="zoneLoading"
+      class="vmr-zone-loading"
+      role="status"
+    >
+      <span class="vmr-zone-spinner" />
+      {{ zoneLoadingLabel }}
+    </div>
     <slot
       v-if="activeMode === 'polygon' && zones.length > 0"
       name="zone-list"
       :zones="zones"
       :remove-zone="removeZone"
       :remove-label="zoneRemoveLabel"
+      :disabled="zoneLoading"
     >
       <ZoneList
+        :disabled="zoneLoading"
         :zones="zones"
         :remove-label="zoneRemoveLabel"
         @remove="removeZone"
@@ -446,5 +515,25 @@ const maxMsg = computed(() => {
   font-size: 13px;
   color: #ef4444;
   text-align: center;
+}
+.vmr-zone-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #6b7280;
+}
+.vmr-zone-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--vmr-search-border, #d1d5db);
+  border-top-color: var(--vmr-primary-color, #3b82f6);
+  border-radius: 50%;
+  animation: vmr-spin 0.6s linear infinite;
+}
+@keyframes vmr-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

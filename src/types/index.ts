@@ -6,6 +6,8 @@ export interface MapRadiusZone {
   id: string
   name: string
   geometry: GeoJSON.Geometry
+  /** Hex color (e.g. "#3b82f6") assigned to this zone, used on the map and the zone chip. */
+  color?: string
 }
 
 export interface MapRadiusState {
@@ -83,6 +85,8 @@ export interface MapRadiusPaintOptions {
   centerMarkerColor?: string
   radiusHandleColor?: string
   radiusTooltipColor?: string
+  /** Hex color palette cycled through as zones are added (e.g. ['#3b82f6', '#ef4444']). */
+  zoneColors?: string[]
 }
 
 export interface MapRadiusInteractiveOptions {
@@ -93,4 +97,5 @@ export interface MapRadiusInteractiveOptions {
 
 export interface MapRadiusZoneListOptions {
   removeLabel?: string
+  loadingLabel?: string
 }

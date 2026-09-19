@@ -52,7 +52,9 @@ export function useMapLayers(
     const circleFillPaint: Record<string, unknown> = { 'fill-color': circleColor }
     if (paintOptions?.circleOpacity != null) circleFillPaint['fill-opacity'] = paintOptions.circleOpacity
 
-    const polygonFillPaint: Record<string, unknown> = { 'fill-color': polygonColor }
+    const polygonFillPaint: Record<string, unknown> = {
+      'fill-color': ['coalesce', ['get', 'fillColor'], polygonColor],
+    }
     if (paintOptions?.polygonOpacity != null) polygonFillPaint['fill-opacity'] = paintOptions.polygonOpacity
 
     instance.on('load', () => {
@@ -85,7 +87,7 @@ export function useMapLayers(
         type: 'line',
         source: POLYGON_SOURCE,
         paint: {
-          'line-color': polygonOutlineColor,
+          'line-color': ['coalesce', ['get', 'color'], polygonOutlineColor],
           'line-width': polygonOutlineWidth,
         },
       })
@@ -121,10 +123,10 @@ export function useMapLayers(
     })
   }
 
-  function updatePolygon(feature: GeoJSON.Feature) {
+  function updatePolygon(data: GeoJSON.Feature | GeoJSON.FeatureCollection) {
     const source = map.value?.getSource(POLYGON_SOURCE) as maplibregl.GeoJSONSource | undefined
     if (!source) return
-    source.setData(feature)
+    source.setData(data)
   }
 
   function setLayersVisibility(mode: 'radius' | 'polygon') {

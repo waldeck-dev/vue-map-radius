@@ -1,10 +1,11 @@
 ﻿<script setup lang="ts">
 import type { Mode } from '../../types'
 
-defineProps<{
+const props = defineProps<{
   mode: Mode
   radiusLabel: string
   polygonLabel: string
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -12,6 +13,7 @@ const emit = defineEmits<{
 }>()
 
 function setMode(m: Mode) {
+  if (props.disabled) return
   emit('update:mode', m)
 }
 </script>
@@ -27,6 +29,7 @@ function setMode(m: Mode) {
       :class="{ 'vmr-mode-btn--active': mode === 'radius' }"
       role="radio"
       :aria-checked="mode === 'radius'"
+      :disabled="disabled"
       @click="setMode('radius')"
     >
       {{ radiusLabel }}
@@ -36,6 +39,7 @@ function setMode(m: Mode) {
       :class="{ 'vmr-mode-btn--active': mode === 'polygon' }"
       role="radio"
       :aria-checked="mode === 'polygon'"
+      :disabled="disabled"
       @click="setMode('polygon')"
     >
       {{ polygonLabel }}
@@ -68,5 +72,9 @@ function setMode(m: Mode) {
 .vmr-mode-btn--active {
   background: var(--vmr-primary-color, #3b82f6);
   color: #ffffff;
+}
+.vmr-mode-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

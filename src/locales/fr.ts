@@ -11,6 +11,7 @@
   'error.noApiKey': 'La clé API MapTiler est requise',
   'error.network': 'Erreur réseau, veuillez réessayer',
   'zone.remove': 'Supprimer',
+  'zone.loading': 'Ajout de la zone…',
 }
 
 export default locales

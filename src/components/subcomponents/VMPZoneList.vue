@@ -1,7 +1,8 @@
 <script setup lang="ts">
 defineProps<{
-  zones: { id: string; name: string }[]
+  zones: { id: string; name: string; color?: string }[]
   removeLabel: string
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -19,12 +20,20 @@ const emit = defineEmits<{
       :key="zone.id"
       class="vmr-zone-chip"
       role="listitem"
+      :style="zone.color ? { borderColor: zone.color } : undefined"
     >
+      <span
+        class="vmr-zone-chip-swatch"
+        :style="{ backgroundColor: zone.color }"
+        aria-hidden="true"
+      />
       <span class="vmr-zone-chip-name">{{ zone.name }}</span>
       <button
         type="button"
         class="vmr-zone-chip-remove"
         :aria-label="`${removeLabel}: ${zone.name}`"
+        :style="zone.color ? { color: zone.color } : undefined"
+        :disabled="disabled"
         @click="emit('remove', zone.id)"
       >
         &times;
@@ -50,6 +59,13 @@ const emit = defineEmits<{
   font-size: 13px;
   color: #374151;
 }
+.vmr-zone-chip-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--vmr-primary-color, #3b82f6);
+}
 .vmr-zone-chip-name {
   line-height: 1.2;
 }
@@ -64,8 +80,13 @@ const emit = defineEmits<{
   line-height: 1;
   color: #6b7280;
   padding: 0 2px;
+  opacity: 0.8;
 }
 .vmr-zone-chip-remove:hover {
-  color: var(--vmr-primary-color, #3b82f6);
+  opacity: 1;
+}
+.vmr-zone-chip-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 </style>

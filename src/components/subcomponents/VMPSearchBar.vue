@@ -9,6 +9,7 @@ const props = defineProps<{
   loading: boolean
   noResultsText?: string
   loadingText?: string
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -65,6 +66,13 @@ watch(() => props.modelValue, () => {
     activeIndex.value = -1
   }
 })
+
+watch(() => props.disabled, (disabled) => {
+  if (disabled) {
+    showDropdown.value = false
+    activeIndex.value = -1
+  }
+})
 </script>
 
 <template>
@@ -77,6 +85,7 @@ watch(() => props.modelValue, () => {
     <input
       :value="modelValue"
       :placeholder="placeholder"
+      :disabled="disabled"
       class="vmr-search-input"
       aria-label="Search for a place"
       aria-autocomplete="list"
@@ -89,7 +98,7 @@ watch(() => props.modelValue, () => {
       @keydown="onKeydown"
     >
     <div
-      v-if="showDropdown"
+      v-if="showDropdown && !disabled"
       id="vmr-search-results"
       class="vmr-search-dropdown"
       role="listbox"
@@ -143,6 +152,10 @@ watch(() => props.modelValue, () => {
 }
 .vmr-search-input:focus {
   border-color: var(--vmr-primary-color, #3b82f6);
+}
+.vmr-search-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 .vmr-search-dropdown {
   position: absolute;

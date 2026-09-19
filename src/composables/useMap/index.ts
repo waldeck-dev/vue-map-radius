@@ -13,7 +13,7 @@ export interface UseMapReturn {
   mapReady: Ref<boolean>
   init: () => void
   updateCircle: (coordinates: [number, number][]) => void
-  updatePolygon: (feature: GeoJSON.Feature) => void
+  updatePolygon: (data: GeoJSON.Feature | GeoJSON.FeatureCollection) => void
   setVisibility: (mode: 'radius' | 'polygon') => void
   fitBounds: (bbox: [number, number, number, number], padding?: number) => void
   flyTo: (c: [number, number], z?: number) => void
