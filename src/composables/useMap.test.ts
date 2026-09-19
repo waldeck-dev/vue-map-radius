@@ -96,14 +96,14 @@ describe('useMapMarkers', () => {
   it('does nothing when map is null', () => {
     const m = useMapMarkers(mapRef)
     expect(() => {
-      m.setCenterMarker([0, 0])
-      m.updateCenterMarkerPosition([1, 1])
-      m.removeCenterMarker()
-      m.setRadiusHandle([0, 0])
-      m.updateRadiusHandlePosition([1, 1])
-      m.removeRadiusHandle()
-      m.setRadiusLine([0, 0], [1, 1])
-      m.removeRadiusLine()
+      m.setCenterMarker('a', [0, 0])
+      m.updateCenterMarkerPosition('a', [1, 1])
+      m.removeCenterMarker('a')
+      m.setRadiusHandle('a', [0, 0])
+      m.updateRadiusHandlePosition('a', [1, 1])
+      m.removeRadiusHandle('a')
+      m.setRadiusLine('a', [0, 0], [1, 1])
+      m.removeRadiusLine('a')
       m.setRadiusTooltip('text', [0, 0])
       m.hideRadiusTooltip()
       m.setMarkersVisibility(true)
@@ -115,7 +115,7 @@ describe('useMapMarkers', () => {
     mapRef.value = mockMap as unknown as maplibregl.Map
     const m = useMapMarkers(mapRef)
 
-    m.setCenterMarker([10, 20])
+    m.setCenterMarker('a', [10, 20])
 
     expect(maplibregl.Marker).toHaveBeenCalled()
     const marker = mockMarkerInstances[0]
@@ -127,12 +127,21 @@ describe('useMapMarkers', () => {
     mapRef.value = mockMap as unknown as maplibregl.Map
     const m = useMapMarkers(mapRef)
 
-    m.setCenterMarker([10, 20])
+    m.setCenterMarker('a', [10, 20])
     expect(mockMarkerInstances).toHaveLength(1)
 
-    m.setCenterMarker([30, 40])
+    m.setCenterMarker('a', [30, 40])
     expect(mockMarkerInstances).toHaveLength(1)
     expect(mockMarkerInstances[0].setLngLat).toHaveBeenLastCalledWith([30, 40])
+  })
+
+  it('creates a separate center marker for a different id', () => {
+    mapRef.value = mockMap as unknown as maplibregl.Map
+    const m = useMapMarkers(mapRef)
+
+    m.setCenterMarker('a', [10, 20])
+    m.setCenterMarker('b', [30, 40])
+    expect(mockMarkerInstances).toHaveLength(2)
   })
 
   it('attaches dragend handler when onDragEnd is provided', () => {
@@ -140,7 +149,7 @@ describe('useMapMarkers', () => {
     const m = useMapMarkers(mapRef)
     const onDragEnd = vi.fn()
 
-    m.setCenterMarker([0, 0], { draggable: true, onDragEnd })
+    m.setCenterMarker('a', [0, 0], { draggable: true, onDragEnd })
 
     const marker = mockMarkerInstances[0]
     expect(marker.on).toHaveBeenCalledWith('dragend', expect.any(Function))
@@ -150,7 +159,7 @@ describe('useMapMarkers', () => {
     mapRef.value = mockMap as unknown as maplibregl.Map
     const m = useMapMarkers(mapRef)
 
-    m.setRadiusHandle([5, 10])
+    m.setRadiusHandle('a', [5, 10])
 
     expect(maplibregl.Marker).toHaveBeenCalled()
     const marker = mockMarkerInstances[0]
@@ -185,17 +194,17 @@ describe('useMapMarkers', () => {
     mapRef.value = mockMap as unknown as maplibregl.Map
     const m = useMapMarkers(mapRef)
 
-    m.setCenterMarker([0, 0])
+    m.setCenterMarker('a', [0, 0])
     const marker = mockMarkerInstances[0]
 
-    m.removeCenterMarker()
+    m.removeCenterMarker('a')
     expect(marker.remove).toHaveBeenCalled()
   })
 
   it('setMarkersVisibility toggles center marker display style', () => {
     mapRef.value = mockMap as unknown as maplibregl.Map
     const m = useMapMarkers(mapRef)
-    m.setCenterMarker([0, 0])
+    m.setCenterMarker('a', [0, 0])
 
     const marker = mockMarkerInstances[0]
     marker.getElement.mockReturnValue({ style: { display: '' } })
@@ -211,8 +220,8 @@ describe('useMapMarkers', () => {
     mapRef.value = mockMap as unknown as maplibregl.Map
     const m = useMapMarkers(mapRef)
 
-    m.setCenterMarker([0, 0])
-    m.setRadiusHandle([1, 1])
+    m.setCenterMarker('a', [0, 0])
+    m.setRadiusHandle('a', [1, 1])
     m.setRadiusTooltip('test', [2, 2])
 
     expect(mockMarkerInstances).toHaveLength(3)
@@ -281,18 +290,12 @@ describe('useMapLayers', () => {
     const mockGeoSource = { setData: vi.fn() }
     mockMap.getSource.mockReturnValue(mockGeoSource)
 
+    const feature = { type: 'Feature' as const, properties: {}, geometry: { type: 'Polygon' as const, coordinates: [] } }
     const l = useMapLayers(mapRef, 'c', 'k', [0, 0], 5)
-    l.updateCircle([[0, 0], [1, 1]])
+    l.updateCircle(feature)
 
     expect(mockMap.getSource).toHaveBeenCalledWith('vmr-circle-source')
-    expect(mockGeoSource.setData).toHaveBeenCalledWith({
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'Polygon',
-        coordinates: [[[0, 0], [1, 1]]],
-      },
-    })
+    expect(mockGeoSource.setData).toHaveBeenCalledWith(feature)
   })
 
   it('updatePolygon calls setData on polygon source', () => {
@@ -392,7 +395,7 @@ describe('useMapLayers', () => {
     const l = useMapLayers(mapRef, 'c', 'k', [0, 0], 5)
 
     expect(() => {
-      l.updateCircle([])
+      l.updateCircle({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [] } })
       l.updatePolygon({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [] } })
       l.setLayersVisibility('radius')
       l.clearCircle()

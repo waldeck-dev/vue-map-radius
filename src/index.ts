@@ -12,6 +12,7 @@ export type {
   Mode,
   MapRadiusState,
   MapRadiusZone,
+  MapRadiusCircleZone,
   GeocodingResult,
   MapRadiusSearchOptions,
   MapRadiusRadiusOptions,
@@ -46,6 +47,12 @@ export { getPolygonBounds } from './utils/geo'
 export { mergeToMultiPolygon } from './utils/geo'
 /** Split a country/region's geometry into its main landmass and far, small outlying parts. */
 export { splitOutlyingParts } from './utils/geo'
+/** Convert a hex color to an rgba() string with the given alpha. */
+export { hexToRgba } from './utils/geo'
+/** Clamp a radius value to a min/max range. */
+export { clampRadius } from './utils/radius'
+/** Get a min/max validation message for a radius value, or null when valid. */
+export { getValidationMessage } from './utils/radius'
 
 /** Coordinate precision trimming and polygon simplification. */
 export { useGeoJSON } from './composables/useGeoJSON'
@@ -53,7 +60,5 @@ export { useGeoJSON } from './composables/useGeoJSON'
 export { useGeocoding } from './composables/useGeocoding'
 /** Lightweight i18n with built-in en/fr locales and custom overrides. */
 export { useTranslation } from './composables/useTranslation'
-/** Radius state management with min/max clamping and validation. */
-export { useRadius } from './composables/useRadius'
 /** MapLibre GL map lifecycle — init, layers, markers, handles, tooltip. */
 export { useMap, buildStyleUrl } from './composables/useMap'

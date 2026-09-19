@@ -11,7 +11,8 @@ const state = ref<MapRadiusState>({
   radiusKm: 20,
   polygon: null,
   name: null,
-  zones: []
+  zones: [],
+  circles: []
 })
 
 const stateJson = computed(() => JSON.stringify(state.value, null, 2))

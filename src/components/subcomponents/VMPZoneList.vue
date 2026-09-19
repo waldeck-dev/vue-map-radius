@@ -3,10 +3,12 @@ defineProps<{
   zones: { id: string; name: string; color?: string }[]
   removeLabel: string
   disabled?: boolean
+  selectedId?: string
 }>()
 
 const emit = defineEmits<{
   (e: 'remove', id: string): void
+  (e: 'select', id: string): void
 }>()
 </script>
 
@@ -19,8 +21,10 @@ const emit = defineEmits<{
       v-for="zone in zones"
       :key="zone.id"
       class="vmr-zone-chip"
+      :class="{ 'vmr-zone-chip--selected': zone.id === selectedId }"
       role="listitem"
       :style="zone.color ? { borderColor: zone.color } : undefined"
+      @click="emit('select', zone.id)"
     >
       <span
         class="vmr-zone-chip-swatch"
@@ -34,7 +38,7 @@ const emit = defineEmits<{
         :aria-label="`${removeLabel}: ${zone.name}`"
         :style="zone.color ? { color: zone.color } : undefined"
         :disabled="disabled"
-        @click="emit('remove', zone.id)"
+        @click.stop="emit('remove', zone.id)"
       >
         &times;
       </button>
@@ -58,6 +62,10 @@ const emit = defineEmits<{
   background: var(--vmr-search-bg, #ffffff);
   font-size: 13px;
   color: #374151;
+  cursor: pointer;
+}
+.vmr-zone-chip--selected {
+  box-shadow: 0 0 0 2px var(--vmr-primary-color, #3b82f6);
 }
 .vmr-zone-chip-swatch {
   width: 8px;

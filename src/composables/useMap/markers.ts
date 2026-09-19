@@ -4,20 +4,23 @@ import type { GeoJSON } from 'geojson'
 import type { MapRadiusPaintOptions } from '../../types'
 
 export function useMapMarkers(map: Ref<maplibregl.Map | null>, paintOptions?: MapRadiusPaintOptions) {
-  let centerMarker: maplibregl.Marker | null = null
-  let radiusHandle: maplibregl.Marker | null = null
+  const centerMarkers = new Map<string, maplibregl.Marker>()
+  const radiusHandles = new Map<string, maplibregl.Marker>()
+  const radiusLineFeatures = new Map<string, GeoJSON.Feature>()
   let radiusTooltip: maplibregl.Marker | null = null
   let radiusTooltipEl: HTMLDivElement | null = null
 
   // --- Center marker ---
 
   function setCenterMarker(
+    id: string,
     lngLat: [number, number],
     opts?: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void },
   ) {
     if (!map.value) return
-    if (centerMarker) {
-      centerMarker.setLngLat(lngLat)
+    const existing = centerMarkers.get(id)
+    if (existing) {
+      existing.setLngLat(lngLat)
       return
     }
     const el = document.createElement('div')
@@ -33,45 +36,48 @@ export function useMapMarkers(map: Ref<maplibregl.Map | null>, paintOptions?: Ma
 
     const draggable = opts?.draggable ?? true
 
-    centerMarker = new maplibregl.Marker({ element: el, draggable })
+    const marker = new maplibregl.Marker({ element: el, draggable })
       .setLngLat(lngLat)
       .addTo(map.value)
+    centerMarkers.set(id, marker)
 
     const cb = opts?.onDragEnd
     if (draggable && cb) {
-      centerMarker.on('dragend', () => {
-        const pos = centerMarker!.getLngLat()
+      marker.on('dragend', () => {
+        const pos = marker.getLngLat()
         cb([pos.lng, pos.lat])
       })
     }
 
     const dragCb = opts?.onDrag
     if (draggable && dragCb) {
-      centerMarker.on('drag', () => {
-        const pos = centerMarker!.getLngLat()
+      marker.on('drag', () => {
+        const pos = marker.getLngLat()
         dragCb([pos.lng, pos.lat])
       })
     }
   }
 
-  function updateCenterMarkerPosition(lngLat: [number, number]) {
-    centerMarker?.setLngLat(lngLat)
+  function updateCenterMarkerPosition(id: string, lngLat: [number, number]) {
+    centerMarkers.get(id)?.setLngLat(lngLat)
   }
 
-  function removeCenterMarker() {
-    centerMarker?.remove()
-    centerMarker = null
+  function removeCenterMarker(id: string) {
+    centerMarkers.get(id)?.remove()
+    centerMarkers.delete(id)
   }
 
   // --- Radius handle ---
 
   function setRadiusHandle(
+    id: string,
     lngLat: [number, number],
     opts?: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void },
   ) {
     if (!map.value) return
-    if (radiusHandle) {
-      radiusHandle.setLngLat(lngLat)
+    const existing = radiusHandles.get(id)
+    if (existing) {
+      existing.setLngLat(lngLat)
       return
     }
     const el = document.createElement('div')
@@ -88,59 +94,64 @@ export function useMapMarkers(map: Ref<maplibregl.Map | null>, paintOptions?: Ma
 
     const draggable = opts?.draggable ?? true
 
-    radiusHandle = new maplibregl.Marker({ element: el, draggable })
+    const marker = new maplibregl.Marker({ element: el, draggable })
       .setLngLat(lngLat)
       .addTo(map.value)
+    radiusHandles.set(id, marker)
 
     const dragEndCb = opts?.onDragEnd
     if (draggable && dragEndCb) {
-      radiusHandle.on('dragend', () => {
-        const pos = radiusHandle!.getLngLat()
+      marker.on('dragend', () => {
+        const pos = marker.getLngLat()
         dragEndCb([pos.lng, pos.lat])
       })
     }
 
     const dragCb = opts?.onDrag
     if (draggable && dragCb) {
-      radiusHandle.on('drag', () => {
-        const pos = radiusHandle!.getLngLat()
+      marker.on('drag', () => {
+        const pos = marker.getLngLat()
         dragCb([pos.lng, pos.lat])
       })
     }
   }
 
-  function updateRadiusHandlePosition(lngLat: [number, number]) {
-    radiusHandle?.setLngLat(lngLat)
+  function updateRadiusHandlePosition(id: string, lngLat: [number, number]) {
+    radiusHandles.get(id)?.setLngLat(lngLat)
   }
 
-  function removeRadiusHandle() {
-    radiusHandle?.remove()
-    radiusHandle = null
+  function removeRadiusHandle(id: string) {
+    radiusHandles.get(id)?.remove()
+    radiusHandles.delete(id)
   }
 
   // --- Radius line ---
 
-  function setRadiusLine(from: [number, number], to: [number, number]) {
+  function syncRadiusLineSource() {
     const source = map.value?.getSource('vmr-radius-line-source') as maplibregl.GeoJSONSource | undefined
     if (!source) return
+    source.setData({ type: 'FeatureCollection', features: [...radiusLineFeatures.values()] })
+  }
 
-    source.setData({
+  function setRadiusLine(id: string, from: [number, number], to: [number, number], color?: string) {
+    radiusLineFeatures.set(id, {
       type: 'Feature',
-      properties: {},
+      properties: { id, color },
       geometry: {
         type: 'LineString',
         coordinates: [from, to],
       },
     })
+    syncRadiusLineSource()
   }
 
-  function removeRadiusLine() {
-    const source = map.value?.getSource('vmr-radius-line-source') as maplibregl.GeoJSONSource | undefined
-    if (!source) return
-    source.setData(emptyLineString())
+  function removeRadiusLine(id: string) {
+    radiusLineFeatures.delete(id)
+    syncRadiusLineSource()
   }
 
   // --- Radius tooltip ---
+  // Stays a single global instance — only one handle can be dragged by one pointer at a time.
 
   function setRadiusTooltip(text: string, lngLat: [number, number]) {
     if (!map.value) return
@@ -178,11 +189,11 @@ export function useMapMarkers(map: Ref<maplibregl.Map | null>, paintOptions?: Ma
   }
 
   function setMarkersVisibility(visible: boolean) {
-    if (centerMarker) {
-      centerMarker.getElement().style.display = visible ? '' : 'none'
+    for (const marker of centerMarkers.values()) {
+      marker.getElement().style.display = visible ? '' : 'none'
     }
-    if (radiusHandle) {
-      radiusHandle.getElement().style.display = visible ? '' : 'none'
+    for (const marker of radiusHandles.values()) {
+      marker.getElement().style.display = visible ? '' : 'none'
     }
     if (radiusTooltip) {
       radiusTooltip.getElement().style.display = visible ? '' : 'none'
@@ -190,8 +201,10 @@ export function useMapMarkers(map: Ref<maplibregl.Map | null>, paintOptions?: Ma
   }
 
   function destroyMarkers() {
-    removeCenterMarker()
-    removeRadiusHandle()
+    for (const id of [...centerMarkers.keys()]) removeCenterMarker(id)
+    for (const id of [...radiusHandles.keys()]) removeRadiusHandle(id)
+    radiusLineFeatures.clear()
+    syncRadiusLineSource()
     hideRadiusTooltip()
   }
 
@@ -208,16 +221,5 @@ export function useMapMarkers(map: Ref<maplibregl.Map | null>, paintOptions?: Ma
     hideRadiusTooltip,
     setMarkersVisibility,
     destroyMarkers,
-  }
-}
-
-function emptyLineString(): GeoJSON.Feature {
-  return {
-    type: 'Feature',
-    properties: {},
-    geometry: {
-      type: 'LineString',
-      coordinates: [],
-    },
   }
 }

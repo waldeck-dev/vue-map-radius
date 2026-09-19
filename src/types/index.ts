@@ -10,6 +10,15 @@ export interface MapRadiusZone {
   color?: string
 }
 
+export interface MapRadiusCircleZone {
+  id: string
+  name: string | null
+  center: [number, number]
+  radiusKm: number
+  /** Hex color (e.g. "#3b82f6") assigned to this circle, used on the map and the zone chip. */
+  color?: string
+}
+
 export interface MapRadiusState {
   mode: Mode
   center: [number, number] | null
@@ -17,6 +26,7 @@ export interface MapRadiusState {
   polygon: GeoJSON.Feature | null
   name: string | null
   zones: MapRadiusZone[]
+  circles: MapRadiusCircleZone[]
   bearing?: number
 }
 

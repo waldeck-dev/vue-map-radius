@@ -1,14 +1,20 @@
-import { ref } from 'vue'
 import type { Ref } from 'vue'
 import type { GeoJSON } from 'geojson'
-import { circleToPolygon, haversineDistance, destinationPoint } from '../utils/geo'
+import { circleToPolygon, haversineDistance, destinationPoint, hexToRgba } from '../utils/geo'
+import { clampRadius } from '../utils/radius'
+
+export interface RadiusCircleState {
+  id: string
+  name: string | null
+  center: [number, number]
+  radiusKm: number
+  bearing: number
+  color: string
+}
 
 export interface InteractiveMarkerCallbacks {
-  setCenter: (pos: [number, number]) => void
-  setRadius: (val: number) => void
-  clamp: () => void
   emitState: () => void
-  clearName?: () => void
+  clearName?: (id: string) => void
 }
 
 export interface InteractiveMarkerOptions {
@@ -23,19 +29,19 @@ export interface InteractiveMarkerOptions {
 export interface MapContainerApi {
   mapReady?: boolean
   clearCircle: () => void
-  updateCircle: (coords: [number, number][]) => void
-  updatePolygon: (feature: GeoJSON.Feature) => void
+  updateCircle: (data: GeoJSON.Feature | GeoJSON.FeatureCollection) => void
+  updatePolygon: (data: GeoJSON.Feature | GeoJSON.FeatureCollection) => void
   clearPolygon: () => void
   setVisibility: (mode: string) => void
   fitBounds: (bbox: [number, number, number, number]) => void
   flyTo: (center: [number, number], zoom?: number) => void
-  setCenterMarker: (pos: [number, number], opts: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void }) => void
-  removeCenterMarker: () => void
-  setRadiusHandle: (pos: [number, number], opts: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void }) => void
-  updateRadiusHandlePosition: (pos: [number, number]) => void
-  removeRadiusHandle: () => void
-  setRadiusLine: (from: [number, number], to: [number, number]) => void
-  removeRadiusLine: () => void
+  setCenterMarker: (id: string, pos: [number, number], opts: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void }) => void
+  removeCenterMarker: (id: string) => void
+  setRadiusHandle: (id: string, pos: [number, number], opts: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void }) => void
+  updateRadiusHandlePosition: (id: string, pos: [number, number]) => void
+  removeRadiusHandle: (id: string) => void
+  setRadiusLine: (id: string, from: [number, number], to: [number, number], color?: string) => void
+  removeRadiusLine: (id: string) => void
   setRadiusTooltip: (text: string, pos: [number, number]) => void
   hideRadiusTooltip: () => void
 }
@@ -49,124 +55,158 @@ function roundToStep(value: number, step: number): number {
 
 export function useInteractiveMarkers(
   opts: InteractiveMarkerOptions,
-  centerPoint: Ref<[number, number] | null>,
-  radiusKm: Ref<number>,
+  circles: Ref<RadiusCircleState[]>,
+  selectedCircleId: Ref<string | null>,
   mapRef: Ref<MapContainerApi | null>,
   callbacks: InteractiveMarkerCallbacks,
 ) {
-  const handleBearing = ref<number>(90)
-  let lastDragUpdate = 0
+  const lastCenterDragUpdate = new Map<string, number>()
+  const lastRadiusDragUpdate = new Map<string, number>()
 
-  function renderCircle() {
-    if (!centerPoint.value || radiusKm.value <= 0) {
+  function findCircle(id: string): RadiusCircleState | undefined {
+    return circles.value.find((c) => c.id === id)
+  }
+
+  function toCircleFeature(c: RadiusCircleState): GeoJSON.Feature {
+    return {
+      type: 'Feature',
+      properties: { id: c.id, color: c.color, fillColor: hexToRgba(c.color, 0.2) },
+      geometry: { type: 'Polygon', coordinates: [circleToPolygon(c.center, c.radiusKm)] },
+    }
+  }
+
+  function renderAllCircles() {
+    if (circles.value.length === 0) {
       mapRef.value?.clearCircle()
       return
     }
-    const coords = circleToPolygon(centerPoint.value, radiusKm.value)
-    mapRef.value?.updateCircle(coords)
+    mapRef.value?.updateCircle({
+      type: 'FeatureCollection',
+      features: circles.value.map(toCircleFeature),
+    })
     mapRef.value?.setVisibility('radius')
   }
 
-  function updateInteractiveMarkers() {
-    if (!centerPoint.value || radiusKm.value <= 0) {
-      mapRef.value?.removeCenterMarker()
-      mapRef.value?.removeRadiusHandle()
-      mapRef.value?.removeRadiusLine()
-      mapRef.value?.hideRadiusTooltip()
-      return
-    }
+  function renderCircle(_id: string) {
+    renderAllCircles()
+  }
+
+  function updateMarkersForCircle(id: string) {
+    const c = findCircle(id)
     const mc = mapRef.value
-    if (!mc) return
+    if (!c || !mc) return
 
     if (opts.draggableCenter) {
-      mc.setCenterMarker(centerPoint.value, {
-        draggable: true,
-        onDragEnd: onCenterDragEnd,
-        onDrag: onCenterDrag,
-      })
+      const { onDrag, onDragEnd } = makeCenterDragHandlers(id)
+      mc.setCenterMarker(id, c.center, { draggable: true, onDragEnd, onDrag })
     } else {
-      mc.removeCenterMarker()
+      mc.removeCenterMarker(id)
     }
 
-    const handlePos = destinationPoint(centerPoint.value, radiusKm.value, handleBearing.value)
+    const handlePos = destinationPoint(c.center, c.radiusKm, c.bearing)
 
     if (opts.draggableRadius) {
-      mc.setRadiusHandle(handlePos, {
-        draggable: true,
-        onDragEnd: onRadiusDragEnd,
-        onDrag: onRadiusDrag,
-      })
-      mc.setRadiusLine(centerPoint.value, handlePos)
+      const { onDrag, onDragEnd } = makeRadiusDragHandlers(id)
+      mc.setRadiusHandle(id, handlePos, { draggable: true, onDragEnd, onDrag })
+      mc.setRadiusLine(id, c.center, handlePos, c.color)
     } else {
-      mc.removeRadiusHandle()
-      mc.removeRadiusLine()
-    }
-
-    if (opts.showRadiusTooltip && opts.draggableRadius) {
-      mc.setRadiusTooltip(roundToStep(radiusKm.value, opts.radiusStep) + ' km', handlePos)
-    } else {
-      mc.hideRadiusTooltip()
+      mc.removeRadiusHandle(id)
+      mc.removeRadiusLine(id)
     }
   }
 
-  function onCenterDragEnd(pos: [number, number]) {
-    centerPoint.value = pos
-    callbacks.setCenter(pos)
-    callbacks.clearName?.()
-    renderCircle()
-    updateInteractiveMarkers()
-    callbacks.emitState()
+  function updateAllMarkers() {
+    circles.value.forEach((c) => updateMarkersForCircle(c.id))
   }
 
-  function onCenterDrag(pos: [number, number]) {
-    if (!centerPoint.value || radiusKm.value <= 0) return
-    centerPoint.value = pos
-    const now = Date.now()
-    if (now - lastDragUpdate < 50) return
-    lastDragUpdate = now
-    const coords = circleToPolygon(pos, radiusKm.value)
-    mapRef.value?.updateCircle(coords)
-    const handlePos = destinationPoint(pos, radiusKm.value, handleBearing.value)
-    mapRef.value?.updateRadiusHandlePosition(handlePos)
-    mapRef.value?.setRadiusLine(pos, handlePos)
+  function removeCircleMarkers(id: string) {
+    mapRef.value?.removeCenterMarker(id)
+    mapRef.value?.removeRadiusHandle(id)
+    mapRef.value?.removeRadiusLine(id)
+    lastCenterDragUpdate.delete(id)
+    lastRadiusDragUpdate.delete(id)
   }
 
-  function onRadiusDragEnd(pos: [number, number]) {
-    if (!centerPoint.value) return
-    const [lng, lat] = centerPoint.value
-    const [dlng, dlat] = [pos[0] - lng, pos[1] - lat]
-    const bearing = (Math.atan2(dlng, dlat) * 180) / Math.PI
-    handleBearing.value = (bearing + 360) % 360
-    const dist = haversineDistance(centerPoint.value, pos)
-    const clamped = Math.max(opts.minRadius, Math.min(opts.maxRadius, dist))
-    callbacks.setRadius(roundToStep(clamped, opts.radiusStep))
-    callbacks.emitState()
+  function makeCenterDragHandlers(id: string) {
+    function onDrag(pos: [number, number]) {
+      const c = findCircle(id)
+      if (!c) return
+      c.center = pos
+      const now = Date.now()
+      if (now - (lastCenterDragUpdate.get(id) ?? 0) < 50) return
+      lastCenterDragUpdate.set(id, now)
+      selectedCircleId.value = id
+      renderAllCircles()
+      const handlePos = destinationPoint(pos, c.radiusKm, c.bearing)
+      mapRef.value?.updateRadiusHandlePosition(id, handlePos)
+      mapRef.value?.setRadiusLine(id, pos, handlePos, c.color)
+    }
+
+    function onDragEnd(pos: [number, number]) {
+      const c = findCircle(id)
+      if (!c) return
+      c.center = pos
+      callbacks.clearName?.(id)
+      selectedCircleId.value = id
+      renderAllCircles()
+      updateMarkersForCircle(id)
+      callbacks.emitState()
+    }
+
+    return { onDrag, onDragEnd }
   }
 
-  function onRadiusDrag(pos: [number, number]) {
-    if (!centerPoint.value) return
-    const dist = haversineDistance(centerPoint.value, pos)
-    const clamped = Math.max(opts.minRadius, Math.min(opts.maxRadius, dist))
-    const displayDist = roundToStep(clamped, opts.radiusStep)
-    mapRef.value?.setRadiusTooltip(displayDist + ' km', pos)
-    const now = Date.now()
-    if (now - lastDragUpdate < 50) return
-    lastDragUpdate = now
-    const coords = circleToPolygon(centerPoint.value, clamped)
-    mapRef.value?.updateCircle(coords)
-    mapRef.value?.setRadiusLine(centerPoint.value, pos)
+  function makeRadiusDragHandlers(id: string) {
+    function onDrag(pos: [number, number]) {
+      const c = findCircle(id)
+      if (!c) return
+      const clamped = clampRadius(haversineDistance(c.center, pos), opts.minRadius, opts.maxRadius)
+      c.radiusKm = clamped
+      if (opts.showRadiusTooltip) {
+        mapRef.value?.setRadiusTooltip(roundToStep(clamped, opts.radiusStep) + ' km', pos)
+      }
+      const now = Date.now()
+      if (now - (lastRadiusDragUpdate.get(id) ?? 0) < 50) return
+      lastRadiusDragUpdate.set(id, now)
+      selectedCircleId.value = id
+      renderAllCircles()
+      mapRef.value?.setRadiusLine(id, c.center, pos, c.color)
+    }
+
+    function onDragEnd(pos: [number, number]) {
+      const c = findCircle(id)
+      if (!c) return
+      const [lng, lat] = c.center
+      const [dlng, dlat] = [pos[0] - lng, pos[1] - lat]
+      const bearing = (Math.atan2(dlng, dlat) * 180) / Math.PI
+      c.bearing = (bearing + 360) % 360
+      const clamped = clampRadius(haversineDistance(c.center, pos), opts.minRadius, opts.maxRadius)
+      c.radiusKm = roundToStep(clamped, opts.radiusStep)
+      selectedCircleId.value = id
+      mapRef.value?.hideRadiusTooltip()
+      renderAllCircles()
+      updateMarkersForCircle(id)
+      callbacks.emitState()
+    }
+
+    return { onDrag, onDragEnd }
   }
 
-  function onRadiusBlur() {
-    callbacks.clamp()
-    callbacks.setRadius(roundToStep(radiusKm.value, opts.radiusStep))
+  function onRadiusBlur(id: string) {
+    const c = findCircle(id)
+    if (!c) return
+    c.radiusKm = roundToStep(clampRadius(c.radiusKm, opts.minRadius, opts.maxRadius), opts.radiusStep)
+    renderAllCircles()
+    updateMarkersForCircle(id)
     callbacks.emitState()
   }
 
   return {
-    handleBearing,
     renderCircle,
-    updateInteractiveMarkers,
+    renderAllCircles,
+    updateMarkersForCircle,
+    updateAllMarkers,
+    removeCircleMarkers,
     onRadiusBlur,
   }
 }

@@ -4,11 +4,11 @@ import type { Ref } from 'vue'
 import type { Mode, GeocodingResult, MapRadiusState, MapRadiusZone, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions, MapRadiusPaintOptions, MapRadiusZoneListOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
 import { useGeocoding } from '../composables/useGeocoding'
-import { useRadius } from '../composables/useRadius'
 import { useGeoJSON } from '../composables/useGeoJSON'
-import { circleToPolygon, toGeoJSON, circleBounds, getPolygonBounds, mergeToMultiPolygon, splitOutlyingParts } from '../utils/geo'
+import { circleToPolygon, toGeoJSON, hexToRgba, getPolygonBounds, mergeToMultiPolygon, splitOutlyingParts } from '../utils/geo'
+import { getValidationMessage } from '../utils/radius'
 import { useInteractiveMarkers } from '../composables/useInteractiveMarkers'
-import type { MapContainerApi } from '../composables/useInteractiveMarkers'
+import type { MapContainerApi, RadiusCircleState } from '../composables/useInteractiveMarkers'
 import SearchBar from './subcomponents/VMPSearchBar.vue'
 import ModeToggle from './subcomponents/VMPModeToggle.vue'
 import RadiusInput from './subcomponents/VMPRadiusInput.vue'
@@ -26,18 +26,6 @@ const DEFAULT_ZONE_COLORS = [
   '#ec4899', // pink
   '#84cc16', // lime
 ]
-
-function hexToRgba(hex: string, alpha: number): string {
-  const normalized = hex.replace('#', '')
-  const full = normalized.length === 3
-    ? normalized.split('').map((c) => c + c).join('')
-    : normalized
-  const value = parseInt(full, 16)
-  const r = (value >> 16) & 255
-  const g = (value >> 8) & 255
-  const b = value & 255
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
-}
 
 const props = withDefaults(defineProps<{
   apiKey: string
@@ -81,13 +69,23 @@ const emit = defineEmits<{
 
 const { t } = useTranslation(props.locale, props.translations)
 const { search: geocodeSearch, results: searchResults, loading: searchLoading, fetchFeatureDetail } = useGeocoding(props.apiKey, props.locale)
-const { radiusKm, setRadius, clamp, validationMessage, setCenter } = useRadius(props.minRadius, props.maxRadius)
 const { trimPrecision, simplify } = useGeoJSON(props.geoOptions)
+
+function generateId(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : 'circle-' + Math.random().toString(36).slice(2, 10)
+}
 
 const activeMode = ref<Mode>(props.mode)
 const searchQuery = ref('')
 const centerPoint = ref<[number, number] | null>(null)
 const zones = ref<MapRadiusZone[]>([])
+const circles = ref<RadiusCircleState[]>([])
+const selectedCircleId = ref<string | null>(null)
+const selectedCircle = computed<RadiusCircleState | null>(() =>
+  circles.value.find((c) => c.id === selectedCircleId.value) ?? null,
+)
 const simplifyTolerance = computed(() => props.geoOptions?.simplifyTolerance ?? 0.025)
 const zoneColors = computed(() => props.paintOptions?.zoneColors?.length ? props.paintOptions.zoneColors : DEFAULT_ZONE_COLORS)
 function nextZoneColor(index: number): string {
@@ -107,6 +105,14 @@ function getSimplifiedZoneGeometry(geometry: GeoJSON.Geometry, tolerance: number
 const polygonFeature = computed<GeoJSON.Feature | null>(() =>
   mergeToMultiPolygon(zones.value.map((z) => getSimplifiedZoneGeometry(z.geometry, simplifyTolerance.value))),
 )
+const radiusPolygonFeature = computed<GeoJSON.Feature | null>(() =>
+  mergeToMultiPolygon(circles.value.map((c) => toGeoJSON([circleToPolygon(c.center, c.radiusKm, props.radiusPolygonPoints)]).geometry!)),
+)
+function fitAllCirclesBounds() {
+  if (!radiusPolygonFeature.value) return
+  const bbox = getPolygonBounds(radiusPolygonFeature.value)
+  if (bbox) mapContainerRef.value?.fitBounds(bbox)
+}
 function toOutputZone(zone: MapRadiusZone): MapRadiusZone {
   return {
     id: zone.id,
@@ -130,7 +136,6 @@ const zoneFeatureCollection = computed<GeoJSON.FeatureCollection>(() => ({
 const zonesName = computed<string | null>(() =>
   zones.value.length ? zones.value.map((z) => z.name).join(', ') : null,
 )
-const polygonName = ref<string | null>(null)
 
 const mapContainerRef = ref<InstanceType<typeof MapContainer> | null>(null)
 const errorMsg = ref<string | null>(null)
@@ -160,10 +165,27 @@ const visibleSearchResults = computed(() =>
     : searchResults.value,
 )
 
+const displayZones = computed(() =>
+  activeMode.value === 'polygon'
+    ? zones.value
+    : circles.value.map((c) => ({ id: c.id, name: c.name || `${c.radiusKm} km`, color: c.color })),
+)
+function removeDisplayZone(id: string) {
+  if (activeMode.value === 'polygon') removeZone(id)
+  else removeCircleZone(id)
+}
+function selectCircle(id: string) {
+  selectedCircleId.value = id
+  const c = circles.value.find((circle) => circle.id === id)
+  if (c) mapContainerRef.value?.flyTo(c.center)
+}
+
 const {
-  handleBearing,
   renderCircle,
-  updateInteractiveMarkers,
+  renderAllCircles,
+  updateMarkersForCircle,
+  updateAllMarkers,
+  removeCircleMarkers,
   onRadiusBlur,
 } = useInteractiveMarkers(
   {
@@ -174,17 +196,34 @@ const {
     draggableRadius: draggableRadius.value,
     showRadiusTooltip: showRadiusTooltip.value,
   },
-  centerPoint,
-  radiusKm,
+  circles,
+  selectedCircleId,
   mapContainerRef as unknown as Ref<MapContainerApi | null>,
   {
-    setCenter,
-    setRadius,
-    clamp,
     emitState,
     clearName,
   },
 )
+
+const selectedRadiusKm = computed<number>({
+  get: () => selectedCircle.value?.radiusKm ?? 0,
+  set: (value) => {
+    const c = selectedCircle.value
+    if (!c) return
+    c.radiusKm = value
+    renderAllCircles()
+    fitAllCirclesBounds()
+    if (draggableRadius.value) {
+      nextTick(() => updateMarkersForCircle(c.id))
+    }
+  },
+})
+
+const radiusValidationMessage = computed(() => {
+  const c = selectedCircle.value
+  if (!c) return null
+  return getValidationMessage(c.radiusKm, props.minRadius, props.maxRadius)
+})
 
 if (props.radiusStep < 0) {
   console.warn('[vue-map-radius] radiusStep must be >= 0, got ' + props.radiusStep)
@@ -214,16 +253,20 @@ function hydrate(state: MapRadiusState) {
 
   if (state.mode === 'radius') {
     zones.value = []
-    polygonName.value = state.name || null
-    if (state.center) {
-      centerPoint.value = state.center
-      setCenter(state.center)
-    }
-    setRadius(state.radiusKm)
-    if (state.bearing != null) {
-      handleBearing.value = state.bearing
-    }
+    circles.value.forEach((c) => removeCircleMarkers(c.id))
+    circles.value = (state.circles ?? []).map((c, i) => ({
+      id: c.id,
+      name: c.name,
+      center: c.center,
+      radiusKm: c.radiusKm,
+      bearing: 90,
+      color: c.color ?? nextZoneColor(i),
+    }))
+    selectedCircleId.value = circles.value[0]?.id ?? null
   } else {
+    circles.value.forEach((c) => removeCircleMarkers(c.id))
+    circles.value = []
+    selectedCircleId.value = null
     centerPoint.value = state.center || null
     zones.value = state.zones
       ? state.zones.map((z, i) => ({ ...z, color: z.color ?? nextZoneColor(i) }))
@@ -231,28 +274,31 @@ function hydrate(state: MapRadiusState) {
   }
 
   renderCurrentState()
-  searchQuery.value = state.mode === 'radius' ? (state.name || '') : ''
+  searchQuery.value = ''
 }
 
-function clearName() {
-  polygonName.value = null
-  searchQuery.value = ''
+function clearName(id: string) {
+  const c = circles.value.find((circle) => circle.id === id)
+  if (c) c.name = null
 }
 
 function emitState() {
   if (internalUpdating.value) return
   const state: MapRadiusState = {
     mode: activeMode.value,
-    center: centerPoint.value,
-    radiusKm: radiusKm.value,
-    polygon: activeMode.value === 'radius' && centerPoint.value && radiusKm.value > 0
-      ? trimPrecision(toGeoJSON([circleToPolygon(centerPoint.value, radiusKm.value, props.radiusPolygonPoints)]))
+    center: activeMode.value === 'radius' ? (selectedCircle.value?.center ?? null) : centerPoint.value,
+    radiusKm: activeMode.value === 'radius' ? (selectedCircle.value?.radiusKm ?? 0) : 0,
+    polygon: activeMode.value === 'radius'
+      ? (radiusPolygonFeature.value ? trimPrecision(radiusPolygonFeature.value) : null)
       : activeMode.value === 'polygon'
         ? polygonFeature.value
         : null,
-    name: activeMode.value === 'radius' ? polygonName.value : zonesName.value,
+    name: activeMode.value === 'radius' ? (selectedCircle.value?.name ?? null) : zonesName.value,
     zones: activeMode.value === 'polygon' ? zones.value.map(toOutputZone) : [],
-    bearing: handleBearing.value,
+    circles: activeMode.value === 'radius'
+      ? circles.value.map((c) => ({ id: c.id, name: c.name, center: c.center, radiusKm: c.radiusKm, color: c.color }))
+      : [],
+    bearing: activeMode.value === 'radius' ? selectedCircle.value?.bearing : undefined,
   }
   emit('update:modelValue', state)
 }
@@ -276,12 +322,20 @@ async function onSelect(result: GeocodingResult) {
   errorMsg.value = null
 
   if (activeMode.value === 'radius') {
-    polygonName.value = result.text
-    centerPoint.value = result.center
-    setCenter(result.center)
-    mapContainerRef.value?.fitBounds(circleBounds(result.center, radiusKm.value))
-    renderCircle()
-    updateInteractiveMarkers()
+    const newCircle: RadiusCircleState = {
+      id: generateId(),
+      name: result.text,
+      center: result.center,
+      radiusKm: selectedCircle.value?.radiusKm ?? 10,
+      bearing: 90,
+      color: nextZoneColor(circles.value.length),
+    }
+    circles.value = [...circles.value, newCircle]
+    selectedCircleId.value = newCircle.id
+    searchQuery.value = ''
+    renderCircle(newCircle.id)
+    updateMarkersForCircle(newCircle.id)
+    fitAllCirclesBounds()
     emitState()
   } else {
     if (zones.value.some((z) => z.id === result.id)) {
@@ -342,13 +396,29 @@ function removeZone(id: string) {
   emitState()
 }
 
+function removeCircleZone(id: string) {
+  const removedIndex = circles.value.findIndex((c) => c.id === id)
+  circles.value = circles.value.filter((c) => c.id !== id)
+  removeCircleMarkers(id)
+  errorMsg.value = null
+  if (circles.value.length === 0) {
+    selectedCircleId.value = null
+    mapContainerRef.value?.clearCircle()
+  } else {
+    const nextIndex = Math.min(removedIndex, circles.value.length - 1)
+    selectedCircleId.value = circles.value[nextIndex]?.id ?? null
+    fitAllCirclesBounds()
+  }
+  emitState()
+}
+
 function renderCurrentState() {
   if (!mapContainerRef.value?.mapReady) return
   if (activeMode.value === 'radius') {
-    if (centerPoint.value && radiusKm.value > 0) {
-      renderCircle()
-      updateInteractiveMarkers()
-      mapContainerRef.value?.fitBounds(circleBounds(centerPoint.value, radiusKm.value))
+    if (circles.value.length > 0) {
+      renderAllCircles()
+      updateAllMarkers()
+      fitAllCirclesBounds()
     }
   } else if (polygonFeature.value) {
     mapContainerRef.value?.updatePolygon(zoneFeatureCollection.value)
@@ -362,49 +432,37 @@ function renderCurrentState() {
   }
 }
 
-watch(radiusKm, () => {
-  if (internalUpdating.value) return
-  renderCircle()
-  if (centerPoint.value && radiusKm.value > 0) {
-    mapContainerRef.value?.fitBounds(circleBounds(centerPoint.value, radiusKm.value))
-  }
-  if (draggableRadius.value) {
-    nextTick(() => updateInteractiveMarkers())
-  }
-})
-
 watch(activeMode, (mode) => {
   searchResults.value = []
   searchQuery.value = ''
   errorMsg.value = null
   if (mode === 'radius') {
     zones.value = []
-    polygonName.value = null
     mapContainerRef.value?.clearPolygon()
-    if (centerPoint.value && radiusKm.value > 0) {
-      renderCircle()
-      updateInteractiveMarkers()
-      mapContainerRef.value?.fitBounds(circleBounds(centerPoint.value, radiusKm.value))
+    if (circles.value.length > 0) {
+      renderAllCircles()
+      updateAllMarkers()
+      fitAllCirclesBounds()
     }
   } else {
     centerPoint.value = null
+    circles.value.forEach((c) => removeCircleMarkers(c.id))
+    circles.value = []
+    selectedCircleId.value = null
     mapContainerRef.value?.clearCircle()
-    mapContainerRef.value?.removeCenterMarker()
-    mapContainerRef.value?.removeRadiusHandle()
-    mapContainerRef.value?.removeRadiusLine()
     mapContainerRef.value?.hideRadiusTooltip()
   }
   if (!internalUpdating.value) emitState()
 })
 
 const minMsg = computed(() => {
-  const v = validationMessage.value
+  const v = radiusValidationMessage.value
   if (v && v.key === 'radius.minMessage') return t(v.key, v.params)
   return undefined
 })
 
 const maxMsg = computed(() => {
-  const v = validationMessage.value
+  const v = radiusValidationMessage.value
   if (v && v.key === 'radius.maxMessage') return t(v.key, v.params)
   return undefined
 })
@@ -460,39 +518,43 @@ const maxMsg = computed(() => {
       {{ zoneLoadingLabel }}
     </div>
     <slot
-      v-if="activeMode === 'polygon' && zones.length > 0"
+      v-if="displayZones.length > 0"
       name="zone-list"
-      :zones="zones"
-      :remove-zone="removeZone"
+      :zones="displayZones"
+      :remove-zone="removeDisplayZone"
       :remove-label="zoneRemoveLabel"
       :disabled="zoneLoading"
+      :selected-id="activeMode === 'radius' ? selectedCircleId : undefined"
+      :select-zone="activeMode === 'radius' ? selectCircle : undefined"
     >
       <ZoneList
         :disabled="zoneLoading"
-        :zones="zones"
+        :zones="displayZones"
         :remove-label="zoneRemoveLabel"
-        @remove="removeZone"
+        :selected-id="activeMode === 'radius' ? (selectedCircleId ?? undefined) : undefined"
+        @remove="removeDisplayZone"
+        @select="activeMode === 'radius' && selectCircle($event)"
       />
     </slot>
     <slot
-      v-if="activeMode === 'radius'"
+      v-if="activeMode === 'radius' && selectedCircleId"
       name="radius-input"
-      :radius="radiusKm"
-      :set-radius="setRadius"
+      :radius="selectedRadiusKm"
+      :set-radius="(v: number) => selectedRadiusKm = v"
       :label="radiusLabel"
       :step="props.radiusStep"
       :min-message="minMsg"
       :max-message="maxMsg"
-      :on-blur="onRadiusBlur"
+      :on-blur="() => selectedCircleId && onRadiusBlur(selectedCircleId)"
     >
       <RadiusInput
-        :model-value="radiusKm"
+        :model-value="selectedRadiusKm"
         :label="radiusLabel"
         :step="props.radiusStep"
         :min-message="minMsg"
         :max-message="maxMsg"
-        @update:model-value="setRadius($event)"
-        @blur="onRadiusBlur"
+        @update:model-value="selectedRadiusKm = $event"
+        @blur="selectedCircleId && onRadiusBlur(selectedCircleId)"
       />
     </slot>
     <div

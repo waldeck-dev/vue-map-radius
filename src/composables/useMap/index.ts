@@ -12,7 +12,7 @@ export interface UseMapReturn {
   map: Ref<maplibregl.Map | null>
   mapReady: Ref<boolean>
   init: () => void
-  updateCircle: (coordinates: [number, number][]) => void
+  updateCircle: (data: GeoJSON.Feature | GeoJSON.FeatureCollection) => void
   updatePolygon: (data: GeoJSON.Feature | GeoJSON.FeatureCollection) => void
   setVisibility: (mode: 'radius' | 'polygon') => void
   fitBounds: (bbox: [number, number, number, number], padding?: number) => void
@@ -21,16 +21,16 @@ export interface UseMapReturn {
   clearPolygon: () => void
   destroy: () => void
 
-  setCenterMarker: (lngLat: [number, number], opts?: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void }) => void
-  updateCenterMarkerPosition: (lngLat: [number, number]) => void
-  removeCenterMarker: () => void
+  setCenterMarker: (id: string, lngLat: [number, number], opts?: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void }) => void
+  updateCenterMarkerPosition: (id: string, lngLat: [number, number]) => void
+  removeCenterMarker: (id: string) => void
 
-  setRadiusHandle: (lngLat: [number, number], opts?: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void }) => void
-  updateRadiusHandlePosition: (lngLat: [number, number]) => void
-  removeRadiusHandle: () => void
+  setRadiusHandle: (id: string, lngLat: [number, number], opts?: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void }) => void
+  updateRadiusHandlePosition: (id: string, lngLat: [number, number]) => void
+  removeRadiusHandle: (id: string) => void
 
-  setRadiusLine: (from: [number, number], to: [number, number]) => void
-  removeRadiusLine: () => void
+  setRadiusLine: (id: string, from: [number, number], to: [number, number], color?: string) => void
+  removeRadiusLine: (id: string) => void
 
   setRadiusTooltip: (text: string, lngLat: [number, number]) => void
   hideRadiusTooltip: () => void

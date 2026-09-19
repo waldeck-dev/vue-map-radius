@@ -49,7 +49,9 @@ export function useMapLayers(
     const polygonOutlineColor = paintOptions?.polygonOutlineColor ?? '#22c55e'
     const polygonOutlineWidth = paintOptions?.polygonOutlineWidth ?? 2
 
-    const circleFillPaint: Record<string, unknown> = { 'fill-color': circleColor }
+    const circleFillPaint: Record<string, unknown> = {
+      'fill-color': ['coalesce', ['get', 'fillColor'], circleColor],
+    }
     if (paintOptions?.circleOpacity != null) circleFillPaint['fill-opacity'] = paintOptions.circleOpacity
 
     const polygonFillPaint: Record<string, unknown> = {
@@ -70,7 +72,7 @@ export function useMapLayers(
         type: 'line',
         source: CIRCLE_SOURCE,
         paint: {
-          'line-color': circleOutlineColor,
+          'line-color': ['coalesce', ['get', 'color'], circleOutlineColor],
           'line-width': circleOutlineWidth,
         },
       })
@@ -92,13 +94,13 @@ export function useMapLayers(
         },
       })
 
-      instance.addSource(RADIUS_LINE_SOURCE, { type: 'geojson', data: emptyLineString() })
+      instance.addSource(RADIUS_LINE_SOURCE, { type: 'geojson', data: emptyFeatureCollection() })
       instance.addLayer({
         id: RADIUS_LINE_LAYER,
         type: 'line',
         source: RADIUS_LINE_SOURCE,
         paint: {
-          'line-color': circleOutlineColor,
+          'line-color': ['coalesce', ['get', 'color'], circleOutlineColor],
           'line-width': 1.5,
           'line-dasharray': [3, 3],
         },
@@ -109,18 +111,10 @@ export function useMapLayers(
     })
   }
 
-  function updateCircle(coordinates: [number, number][]) {
+  function updateCircle(data: GeoJSON.Feature | GeoJSON.FeatureCollection) {
     const source = map.value?.getSource(CIRCLE_SOURCE) as maplibregl.GeoJSONSource | undefined
     if (!source) return
-
-    source.setData({
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'Polygon',
-        coordinates: [coordinates],
-      },
-    })
+    source.setData(data)
   }
 
   function updatePolygon(data: GeoJSON.Feature | GeoJSON.FeatureCollection) {
@@ -157,7 +151,7 @@ export function useMapLayers(
   }
 
   function clearCircle() {
-    updateCircle([])
+    updateCircle(emptyFeature())
   }
 
   function clearPolygon() {
@@ -196,13 +190,6 @@ function emptyFeature(): GeoJSON.Feature {
   }
 }
 
-function emptyLineString(): GeoJSON.Feature {
-  return {
-    type: 'Feature',
-    properties: {},
-    geometry: {
-      type: 'LineString',
-      coordinates: [],
-    },
-  }
+function emptyFeatureCollection(): GeoJSON.FeatureCollection {
+  return { type: 'FeatureCollection', features: [] }
 }
