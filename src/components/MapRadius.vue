@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
 import type { Ref } from 'vue'
-import type { Mode, GeocodingResult, MapRadiusState, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions, MapRadiusPaintOptions } from '../types'
+import type { Mode, GeocodingResult, MapRadiusState, MapRadiusZone, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions, MapRadiusPaintOptions, MapRadiusZoneListOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
 import { useGeocoding } from '../composables/useGeocoding'
 import { useRadius } from '../composables/useRadius'
 import { useGeoJSON } from '../composables/useGeoJSON'
-import { circleToPolygon, toGeoJSON, circleBounds, getPolygonBounds } from '../utils/geo'
+import { circleToPolygon, toGeoJSON, circleBounds, getPolygonBounds, mergeToMultiPolygon } from '../utils/geo'
 import { useInteractiveMarkers } from '../composables/useInteractiveMarkers'
 import type { MapContainerApi } from '../composables/useInteractiveMarkers'
 import SearchBar from './subcomponents/VMPSearchBar.vue'
 import ModeToggle from './subcomponents/VMPModeToggle.vue'
 import RadiusInput from './subcomponents/VMPRadiusInput.vue'
+import ZoneList from './subcomponents/VMPZoneList.vue'
 import MapContainer from './subcomponents/VMPMapContainer.vue'
 import type { GeoJSON } from 'geojson'
 
@@ -36,6 +37,7 @@ const props = withDefaults(defineProps<{
   paintOptions?: MapRadiusPaintOptions
   modes?: Mode[]
   interactiveOptions?: MapRadiusInteractiveOptions
+  zoneListOptions?: MapRadiusZoneListOptions
 }>(), {
   center: () => [0, 20] as [number, number],
   zoom: 2,
@@ -62,7 +64,24 @@ const { trimPrecision, simplify } = useGeoJSON(props.geoOptions)
 const activeMode = ref<Mode>(props.mode)
 const searchQuery = ref('')
 const centerPoint = ref<[number, number] | null>(null)
-const polygonFeature = ref<GeoJSON.Feature | null>(null)
+const zones = ref<MapRadiusZone[]>([])
+const simplifyTolerance = computed(() => props.geoOptions?.simplifyTolerance ?? 0.025)
+const polygonFeature = computed<GeoJSON.Feature | null>(() => {
+  const merged = mergeToMultiPolygon(zones.value.map((z) => z.geometry))
+  if (!merged) return null
+  return trimPrecision(simplify(merged, simplifyTolerance.value))
+})
+function toOutputZone(zone: MapRadiusZone): MapRadiusZone {
+  const simplified = simplify(toGeoJSON(zone.geometry), simplifyTolerance.value)
+  return {
+    id: zone.id,
+    name: zone.name,
+    geometry: trimPrecision(simplified.geometry!),
+  }
+}
+const zonesName = computed<string | null>(() =>
+  zones.value.length ? zones.value.map((z) => z.name).join(', ') : null,
+)
 const polygonName = ref<string | null>(null)
 
 const mapContainerRef = ref<InstanceType<typeof MapContainer> | null>(null)
@@ -83,6 +102,13 @@ const modeRadiusLabel = computed(() => props.modeToggleOptions?.radiusLabel ?? t
 const modePolygonLabel = computed(() => props.modeToggleOptions?.polygonLabel ?? t('mode.polygon'))
 const mapStyleUrl = computed(() => props.mapOptions?.style)
 const showModeToggle = computed(() => props.modes.length > 1)
+const zoneRemoveLabel = computed(() => props.zoneListOptions?.removeLabel ?? t('zone.remove'))
+
+const visibleSearchResults = computed(() =>
+  activeMode.value === 'polygon'
+    ? searchResults.value.filter((r) => !zones.value.some((z) => z.id === r.id))
+    : searchResults.value,
+)
 
 const {
   handleBearing,
@@ -137,7 +163,7 @@ function hydrate(state: MapRadiusState) {
   searchResults.value = []
 
   if (state.mode === 'radius') {
-    polygonFeature.value = null
+    zones.value = []
     polygonName.value = state.name || null
     if (state.center) {
       centerPoint.value = state.center
@@ -149,12 +175,11 @@ function hydrate(state: MapRadiusState) {
     }
   } else {
     centerPoint.value = state.center || null
-    polygonFeature.value = state.polygon || null
-    polygonName.value = state.name || null
+    zones.value = state.zones ? state.zones.map((z) => ({ ...z })) : []
   }
 
   renderCurrentState()
-  searchQuery.value = state.name || ''
+  searchQuery.value = state.mode === 'radius' ? (state.name || '') : ''
 }
 
 function clearName() {
@@ -170,10 +195,11 @@ function emitState() {
     radiusKm: radiusKm.value,
     polygon: activeMode.value === 'radius' && centerPoint.value && radiusKm.value > 0
       ? trimPrecision(toGeoJSON([circleToPolygon(centerPoint.value, radiusKm.value, props.radiusPolygonPoints)]))
-      : activeMode.value === 'polygon' && polygonFeature.value
-        ? trimPrecision(simplify(polygonFeature.value, props.geoOptions?.simplifyTolerance ?? 0.01))
+      : activeMode.value === 'polygon'
+        ? polygonFeature.value
         : null,
-    name: polygonName.value,
+    name: activeMode.value === 'radius' ? polygonName.value : zonesName.value,
+    zones: activeMode.value === 'polygon' ? zones.value.map(toOutputZone) : [],
     bearing: handleBearing.value,
   }
   emit('update:modelValue', state)
@@ -206,6 +232,10 @@ async function onSelect(result: GeocodingResult) {
     updateInteractiveMarkers()
     emitState()
   } else {
+    if (zones.value.some((z) => z.id === result.id)) {
+      searchQuery.value = ''
+      return
+    }
     try {
       const feature = await fetchFeatureDetail(result.id)
       if (!feature || !feature.geometry) {
@@ -213,24 +243,40 @@ async function onSelect(result: GeocodingResult) {
         errorMsg.value = t('info.nonPolygon')
         return
       }
-      if (feature.geometry.type === 'Point') {
+      if (feature.geometry.type !== 'Polygon' && feature.geometry.type !== 'MultiPolygon') {
         centerPoint.value = feature.center
         mapContainerRef.value?.flyTo(feature.center, 10)
         errorMsg.value = t('info.nonPolygon')
         return
       }
-      polygonFeature.value = toGeoJSON(feature.geometry)
-      polygonName.value = feature.text
+      zones.value = [...zones.value, { id: result.id, name: feature.text, geometry: feature.geometry }]
+      searchQuery.value = ''
       mapContainerRef.value?.updatePolygon(polygonFeature.value!)
       mapContainerRef.value?.setVisibility('polygon')
-      if (feature.bbox) {
-        mapContainerRef.value?.fitBounds(feature.bbox as [number, number, number, number])
+      const bbox = getPolygonBounds(polygonFeature.value!) ?? (feature.bbox as [number, number, number, number] | undefined)
+      if (bbox) {
+        mapContainerRef.value?.fitBounds(bbox)
       }
       emitState()
     } catch (err) {
       errorMsg.value = err instanceof Error ? err.message : t('error.network')
     }
   }
+}
+
+function removeZone(id: string) {
+  zones.value = zones.value.filter((z) => z.id !== id)
+  errorMsg.value = null
+  if (zones.value.length === 0) {
+    mapContainerRef.value?.clearPolygon()
+  } else {
+    mapContainerRef.value?.updatePolygon(polygonFeature.value!)
+    const bbox = getPolygonBounds(polygonFeature.value!)
+    if (bbox) {
+      mapContainerRef.value?.fitBounds(bbox)
+    }
+  }
+  emitState()
 }
 
 function renderCurrentState() {
@@ -269,7 +315,7 @@ watch(activeMode, (mode) => {
   searchQuery.value = ''
   errorMsg.value = null
   if (mode === 'radius') {
-    polygonFeature.value = null
+    zones.value = []
     polygonName.value = null
     mapContainerRef.value?.clearPolygon()
     if (centerPoint.value && radiusKm.value > 0) {
@@ -322,7 +368,7 @@ const maxMsg = computed(() => {
       name="search-bar"
       :query="searchQuery"
       :placeholder="searchPlaceholder"
-      :results="searchResults"
+      :results="visibleSearchResults"
       :loading="searchLoading"
       :update-query="(val: string) => searchQuery = val"
       :on-select="onSelect"
@@ -330,12 +376,25 @@ const maxMsg = computed(() => {
       <SearchBar
         :model-value="searchQuery"
         :placeholder="searchPlaceholder"
-        :results="searchResults"
+        :results="visibleSearchResults"
         :loading="searchLoading"
         :no-results-text="searchNoResultsText"
         :loading-text="searchLoadingText"
         @update:model-value="searchQuery = $event"
         @select="onSelect"
+      />
+    </slot>
+    <slot
+      v-if="activeMode === 'polygon' && zones.length > 0"
+      name="zone-list"
+      :zones="zones"
+      :remove-zone="removeZone"
+      :remove-label="zoneRemoveLabel"
+    >
+      <ZoneList
+        :zones="zones"
+        :remove-label="zoneRemoveLabel"
+        @remove="removeZone"
       />
     </slot>
     <slot

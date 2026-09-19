@@ -10,6 +10,7 @@
   'mode.polygon': 'Polygone',
   'error.noApiKey': 'La clé API MapTiler est requise',
   'error.network': 'Erreur réseau, veuillez réessayer',
+  'zone.remove': 'Supprimer',
 }
 
 export default locales

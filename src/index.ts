@@ -11,6 +11,7 @@ export default MapRadius
 export type {
   Mode,
   MapRadiusState,
+  MapRadiusZone,
   GeocodingResult,
   MapRadiusSearchOptions,
   MapRadiusRadiusOptions,
@@ -19,6 +20,7 @@ export type {
   MapRadiusGeoOptions,
   MapRadiusPaintOptions,
   MapRadiusInteractiveOptions,
+  MapRadiusZoneListOptions,
 } from './types'
 
 /** Convert a center point + radius into a polygon vertex array. */
@@ -39,6 +41,8 @@ export { destinationPoint } from './utils/geo'
 export { circleBounds } from './utils/geo'
 /** Bounding box `[w, s, e, n]` of a GeoJSON polygon feature. */
 export { getPolygonBounds } from './utils/geo'
+/** Combine multiple Polygon/MultiPolygon geometries into one MultiPolygon Feature. */
+export { mergeToMultiPolygon } from './utils/geo'
 
 /** Coordinate precision trimming and polygon simplification. */
 export { useGeoJSON } from './composables/useGeoJSON'

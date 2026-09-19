@@ -46,6 +46,31 @@ export function toGeoJSON(
   }
 }
 
+export function mergeToMultiPolygon(
+  geometries: GeoJSON.Geometry[],
+): GeoJSON.Feature | null {
+  const coordinates: GeoJSON.Position[][][] = []
+
+  for (const geometry of geometries) {
+    if (geometry.type === 'Polygon') {
+      coordinates.push(geometry.coordinates)
+    } else if (geometry.type === 'MultiPolygon') {
+      coordinates.push(...geometry.coordinates)
+    }
+  }
+
+  if (coordinates.length === 0) return null
+
+  return {
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'MultiPolygon',
+      coordinates,
+    },
+  }
+}
+
 function trimCoords(value: unknown, decimals: number): unknown {
   if (typeof value === 'number') {
     return Number(value.toFixed(decimals))

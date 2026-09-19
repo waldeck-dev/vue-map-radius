@@ -17,11 +17,11 @@ describe('useGeoJSON', () => {
     expect(result.coordinates).toEqual([1.2, 2.3])
   })
 
-  it('should default to 6 decimals when no option set', () => {
+  it('should default to 4 decimals when no option set', () => {
     const { trimPrecision } = useGeoJSON()
     const point: GeoJSON.Point = { type: 'Point', coordinates: [1.123456789, 2.987654321] }
     const result = trimPrecision(point)
-    expect(result.coordinates).toEqual([1.123457, 2.987654])
+    expect(result.coordinates).toEqual([1.1235, 2.9877])
   })
 
   it('should not simplify when simplifyTolerance is not set', () => {

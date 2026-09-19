@@ -9,7 +9,7 @@ export function useGeoJSON(options?: {
     geojson: T,
     decimals?: number,
   ): T {
-    return trimCoordPrecision(geojson, decimals ?? options?.coordPrecision ?? 6)
+    return trimCoordPrecision(geojson, decimals ?? options?.coordPrecision ?? 4)
   }
 
   function simplify(feature: GeoJSON.Feature, tolerance?: number): GeoJSON.Feature {

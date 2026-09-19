@@ -2,12 +2,19 @@ import type { GeoJSON } from 'geojson'
 
 export type Mode = 'radius' | 'polygon'
 
+export interface MapRadiusZone {
+  id: string
+  name: string
+  geometry: GeoJSON.Geometry
+}
+
 export interface MapRadiusState {
   mode: Mode
   center: [number, number] | null
   radiusKm: number
   polygon: GeoJSON.Feature | null
   name: string | null
+  zones: MapRadiusZone[]
   bearing?: number
 }
 
@@ -82,4 +89,8 @@ export interface MapRadiusInteractiveOptions {
   draggableCenter?: boolean
   draggableRadius?: boolean
   showRadiusTooltip?: boolean
+}
+
+export interface MapRadiusZoneListOptions {
+  removeLabel?: string
 }

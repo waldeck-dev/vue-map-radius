@@ -10,6 +10,7 @@ const locales: Record<string, string> = {
   'mode.polygon': 'Polygon',
   'error.noApiKey': 'MapTiler API key is required',
   'error.network': 'Network error, please try again',
+  'zone.remove': 'Remove',
 }
 
 export default locales

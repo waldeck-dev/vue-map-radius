@@ -1,6 +1,6 @@
 import type { GeoJSON } from 'geojson'
 import { describe, it, expect } from 'vitest'
-import { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint, circleBounds, getPolygonBounds } from '../utils/geo'
+import { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint, circleBounds, getPolygonBounds, mergeToMultiPolygon } from '../utils/geo'
 
 describe('circleToPolygon', () => {
   it('should return 64 points plus closing point by default', () => {
@@ -289,6 +289,63 @@ describe('getPolygonBounds', () => {
       geometry: { type: 'Polygon', coordinates: [[]] },
     }
     expect(getPolygonBounds(feature)).toBeNull()
+  })
+})
+
+describe('mergeToMultiPolygon', () => {
+  const polygonA: GeoJSON.Polygon = {
+    type: 'Polygon',
+    coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]],
+  }
+  const polygonB: GeoJSON.Polygon = {
+    type: 'Polygon',
+    coordinates: [[[10, 10], [11, 10], [11, 11], [10, 11], [10, 10]]],
+  }
+  const multiPolygon: GeoJSON.MultiPolygon = {
+    type: 'MultiPolygon',
+    coordinates: [
+      [[[20, 20], [21, 20], [21, 21], [20, 21], [20, 20]]],
+      [[[30, 30], [31, 30], [31, 31], [30, 31], [30, 30]]],
+    ],
+  }
+
+  it('merges two Polygon geometries into one MultiPolygon feature', () => {
+    const result = mergeToMultiPolygon([polygonA, polygonB])
+    expect(result?.geometry.type).toBe('MultiPolygon')
+    const geom = result?.geometry as GeoJSON.MultiPolygon
+    expect(geom.coordinates).toHaveLength(2)
+    expect(geom.coordinates[0]).toEqual(polygonA.coordinates)
+    expect(geom.coordinates[1]).toEqual(polygonB.coordinates)
+  })
+
+  it('flattens a MultiPolygon alongside a Polygon', () => {
+    const result = mergeToMultiPolygon([multiPolygon, polygonA])
+    const geom = result?.geometry as GeoJSON.MultiPolygon
+    expect(geom.coordinates).toHaveLength(3)
+  })
+
+  it('still returns a MultiPolygon for a single Polygon input', () => {
+    const result = mergeToMultiPolygon([polygonA])
+    expect(result?.geometry.type).toBe('MultiPolygon')
+    const geom = result?.geometry as GeoJSON.MultiPolygon
+    expect(geom.coordinates).toHaveLength(1)
+  })
+
+  it('returns null for an empty array', () => {
+    expect(mergeToMultiPolygon([])).toBeNull()
+  })
+
+  it('returns null when only unsupported geometry types are given', () => {
+    const point: GeoJSON.Point = { type: 'Point', coordinates: [0, 0] }
+    expect(mergeToMultiPolygon([point])).toBeNull()
+  })
+
+  it('skips unsupported geometry types mixed with valid ones', () => {
+    const point: GeoJSON.Point = { type: 'Point', coordinates: [0, 0] }
+    const result = mergeToMultiPolygon([point, polygonA])
+    const geom = result?.geometry as GeoJSON.MultiPolygon
+    expect(geom.coordinates).toHaveLength(1)
+    expect(geom.coordinates[0]).toEqual(polygonA.coordinates)
   })
 })
 
