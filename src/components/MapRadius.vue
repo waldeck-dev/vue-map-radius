@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef, watch, computed, nextTick } from 'vue'
+import { ref, shallowRef, watch, computed, nextTick, toRaw } from 'vue'
 import type { Ref } from 'vue'
 import type { Mode, GeocodingResult, MapRadiusState, MapRadiusZone, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions, MapRadiusPaintOptions, MapRadiusZoneListOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
@@ -68,7 +68,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useTranslation(props.locale, props.translations)
-const { search: geocodeSearch, results: searchResults, loading: searchLoading, fetchFeatureDetail } = useGeocoding(props.apiKey, props.locale)
+const { search: geocodeSearch, results: searchResults, loading: searchLoading, error: searchError, fetchFeatureDetail } = useGeocoding(props.apiKey, props.locale)
 const { trimPrecision, simplify } = useGeoJSON(props.geoOptions)
 
 function generateId(): string {
@@ -94,6 +94,15 @@ const simplifyTolerance = computed(() => props.geoOptions?.simplifyTolerance ?? 
 const zoneColors = computed(() => props.paintOptions?.zoneColors?.length ? props.paintOptions.zoneColors : DEFAULT_ZONE_COLORS)
 function nextZoneColor(index: number): string {
   return zoneColors.value[index % zoneColors.value.length]
+}
+/**
+ * Picks the first palette colour nobody is using, so removing a zone and adding
+ * another does not hand out a colour already on the map. Falls back to cycling
+ * once every colour is taken.
+ */
+function unusedZoneColor(taken: (string | undefined)[]): string {
+  const free = zoneColors.value.find((color) => !taken.includes(color))
+  return free ?? nextZoneColor(taken.length)
 }
 // Simplifying a country-sized polygon is the expensive part of adding a zone.
 // Cache the result per raw geometry so unrelated zones aren't re-simplified
@@ -181,9 +190,13 @@ function removeDisplayZone(id: string) {
   else removeCircleZone(id)
 }
 function selectCircle(id: string) {
+  if (selectedCircleId.value === id) return
   selectedCircleId.value = id
   const c = circles.value.find((circle) => circle.id === id)
   if (c) mapContainerRef.value?.flyTo(c.center)
+  // The emitted center/radiusKm/name/bearing all describe the selected circle,
+  // so selection has to emit or the parent keeps reporting the previous one.
+  emitState()
 }
 
 const {
@@ -251,10 +264,24 @@ watch(searchQuery, (val) => {
   }, 300)
 })
 
+// A failed autocomplete used to surface as an empty dropdown: useGeocoding set
+// its error ref and nobody read it, so a bad key or a rate limit was reported
+// to the user as "no results found".
+watch(searchError, (message) => {
+  if (message) errorMsg.value = message
+})
+
 function hydrate(state: MapRadiusState) {
-  activeMode.value = state.mode
   errorMsg.value = null
   searchResults.value = []
+
+  // Tear the other mode down here rather than from a watcher on activeMode: a
+  // pre-flush watcher runs *after* this function's body and would undo the
+  // assignments below (it used to null the centerPoint we are about to set).
+  if (activeMode.value !== state.mode) {
+    activeMode.value = state.mode
+    teardownMode(state.mode)
+  }
 
   if (state.mode === 'radius') {
     zones.value = []
@@ -311,10 +338,11 @@ function emitState() {
 
 watch(() => props.modelValue, (val) => {
   if (!val) return
-  // A v-model parent hands our own object straight back. Re-hydrating from it
-  // would tear down and rebuild every marker and refit the camera on every
-  // drag end, so ignore the echo and only react to state we did not produce.
-  if (val === lastEmitted) return
+  // A v-model parent hands our own object straight back, usually wrapped in a
+  // reactive proxy by its own ref. Re-hydrating from it would tear down and
+  // rebuild every marker and refit the camera on every drag end, so compare the
+  // raw object and only react to state we did not produce.
+  if (toRaw(val) === lastEmitted) return
   internalUpdating.value = true
   hydrate(val)
   nextTick(() => { internalUpdating.value = false })
@@ -338,7 +366,7 @@ async function onSelect(result: GeocodingResult) {
       center: result.center,
       radiusKm: selectedCircle.value?.radiusKm ?? 10,
       bearing: 90,
-      color: nextZoneColor(circles.value.length),
+      color: unusedZoneColor(circles.value.map((c) => c.color)),
     }
     circles.value = [...circles.value, newCircle]
     selectedCircleId.value = newCircle.id
@@ -375,7 +403,7 @@ async function onSelect(result: GeocodingResult) {
         }).main
         : feature.geometry
 
-      zones.value = [...zones.value, { id: result.id, name: feature.text, geometry: mainGeometry, color: nextZoneColor(zones.value.length) }]
+      zones.value = [...zones.value, { id: result.id, name: feature.text, geometry: mainGeometry, color: unusedZoneColor(zones.value.map((z) => z.color)) }]
       searchQuery.value = ''
       mapContainerRef.value?.updatePolygon(zoneFeatureCollection.value)
       mapContainerRef.value?.setVisibility('polygon')
@@ -424,39 +452,34 @@ function removeCircleZone(id: string) {
 }
 
 function renderCurrentState() {
-  if (!mapContainerRef.value?.mapReady) return
+  const map = mapContainerRef.value
+  if (!map?.mapReady) return
   if (activeMode.value === 'radius') {
+    map.setVisibility('radius')
+    // Clears the source when there are no circles, so hydrating an empty
+    // radius state no longer leaves the previous circles on the map.
+    renderAllCircles()
     if (circles.value.length > 0) {
-      renderAllCircles()
-      mapContainerRef.value?.setVisibility('radius')
       updateAllMarkers()
       fitAllCirclesBounds()
     }
-  } else if (polygonFeature.value) {
-    mapContainerRef.value?.updatePolygon(zoneFeatureCollection.value)
-    mapContainerRef.value?.setVisibility('polygon')
-    const bbox = getPolygonBounds(polygonFeature.value)
+  } else {
+    map.setVisibility('polygon')
+    map.updatePolygon(zoneFeatureCollection.value)
+    const bbox = polygonFeature.value ? getPolygonBounds(polygonFeature.value) : null
     if (bbox) {
-      mapContainerRef.value?.fitBounds(bbox)
+      map.fitBounds(bbox)
     } else if (centerPoint.value) {
-      mapContainerRef.value?.flyTo(centerPoint.value)
+      map.flyTo(centerPoint.value)
     }
   }
 }
 
-watch(activeMode, (mode) => {
-  searchResults.value = []
-  searchQuery.value = ''
-  errorMsg.value = null
+/** Drops everything belonging to the mode we are leaving. */
+function teardownMode(mode: Mode) {
   if (mode === 'radius') {
     zones.value = []
     mapContainerRef.value?.clearPolygon()
-    mapContainerRef.value?.setVisibility('radius')
-    if (circles.value.length > 0) {
-      renderAllCircles()
-      updateAllMarkers()
-      fitAllCirclesBounds()
-    }
   } else {
     centerPoint.value = null
     circles.value.forEach((c) => removeCircleMarkers(c.id))
@@ -465,8 +488,18 @@ watch(activeMode, (mode) => {
     mapContainerRef.value?.clearCircle()
     mapContainerRef.value?.hideRadiusTooltip()
   }
-  if (!internalUpdating.value) emitState()
-})
+}
+
+function setMode(mode: Mode) {
+  if (activeMode.value === mode) return
+  activeMode.value = mode
+  searchResults.value = []
+  searchQuery.value = ''
+  errorMsg.value = null
+  teardownMode(mode)
+  renderCurrentState()
+  emitState()
+}
 
 const minMsg = computed(() => {
   const v = radiusValidationMessage.value
@@ -490,14 +523,14 @@ const maxMsg = computed(() => {
       :radius-label="modeRadiusLabel"
       :polygon-label="modePolygonLabel"
       :disabled="zoneLoading"
-      :switch-mode="(m: Mode) => activeMode = m"
+      :switch-mode="setMode"
     >
       <ModeToggle
         :mode="activeMode"
         :radius-label="modeRadiusLabel"
         :polygon-label="modePolygonLabel"
         :disabled="zoneLoading"
-        @update:mode="activeMode = $event"
+        @update:mode="setMode"
       />
     </slot>
     <slot
