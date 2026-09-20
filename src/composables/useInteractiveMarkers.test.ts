@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref } from 'vue'
 import { useInteractiveMarkers } from './useInteractiveMarkers'
-import type { MapContainerApi, InteractiveMarkerOptions, InteractiveMarkerCallbacks, RadiusCircleState } from './useInteractiveMarkers'
+import type { MapCommands, InteractiveMarkerOptions, InteractiveMarkerCallbacks, RadiusCircleState } from './useInteractiveMarkers'
 
-function createMockMap(): MapContainerApi {
+function createMockMap(): MapCommands {
   return {
     clearCircle: vi.fn(),
     updateCircle: vi.fn(),
@@ -55,16 +55,16 @@ function makeCircle(overrides: Partial<RadiusCircleState> = {}): RadiusCircleSta
 describe('useInteractiveMarkers', () => {
   it('renderAllCircles clears the circle source when there are no circles', () => {
     const circles = ref<RadiusCircleState[]>([])
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
-    const { renderAllCircles } = useInteractiveMarkers(defaultOpts, circles, ref(null), mapRef, makeCallbacks())
+    const mapRef = ref<MapCommands | null>(createMockMap())
+    const { renderAllCircles } = useInteractiveMarkers(defaultOpts, circles, ref(null), () => mapRef.value, makeCallbacks())
     renderAllCircles()
     expect(mapRef.value!.clearCircle).toHaveBeenCalledTimes(1)
   })
 
   it('renderAllCircles builds a FeatureCollection with one feature per circle', () => {
     const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a' }), makeCircle({ id: 'b', center: [1, 1] })])
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
-    const { renderAllCircles } = useInteractiveMarkers(defaultOpts, circles, ref(null), mapRef, makeCallbacks())
+    const mapRef = ref<MapCommands | null>(createMockMap())
+    const { renderAllCircles } = useInteractiveMarkers(defaultOpts, circles, ref(null), () => mapRef.value, makeCallbacks())
     renderAllCircles()
     expect(mapRef.value!.updateCircle).toHaveBeenCalledTimes(1)
     const data = (mapRef.value!.updateCircle as ReturnType<typeof vi.fn>).mock.calls[0][0]
@@ -74,16 +74,16 @@ describe('useInteractiveMarkers', () => {
 
   it('renderAllCircles does not touch layer visibility (a mode-transition concern)', () => {
     const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a' })])
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
-    const { renderAllCircles } = useInteractiveMarkers(defaultOpts, circles, ref(null), mapRef, makeCallbacks())
+    const mapRef = ref<MapCommands | null>(createMockMap())
+    const { renderAllCircles } = useInteractiveMarkers(defaultOpts, circles, ref(null), () => mapRef.value, makeCallbacks())
     renderAllCircles()
     expect(mapRef.value!.setVisibility).not.toHaveBeenCalled()
   })
 
   it('reuses the cached feature for circles that did not change', () => {
     const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a' }), makeCircle({ id: 'b', center: [1, 1] })])
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
-    const { renderAllCircles } = useInteractiveMarkers(defaultOpts, circles, ref(null), mapRef, makeCallbacks())
+    const mapRef = ref<MapCommands | null>(createMockMap())
+    const { renderAllCircles } = useInteractiveMarkers(defaultOpts, circles, ref(null), () => mapRef.value, makeCallbacks())
     renderAllCircles()
     circles.value[1].radiusKm = 25
     renderAllCircles()
@@ -94,8 +94,8 @@ describe('useInteractiveMarkers', () => {
 
   it('updateMarkersForCircle sets a center marker and radius handle for the given id', () => {
     const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a' })])
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
-    const { updateMarkersForCircle } = useInteractiveMarkers(defaultOpts, circles, ref(null), mapRef, makeCallbacks())
+    const mapRef = ref<MapCommands | null>(createMockMap())
+    const { updateMarkersForCircle } = useInteractiveMarkers(defaultOpts, circles, ref(null), () => mapRef.value, makeCallbacks())
     updateMarkersForCircle('a')
     expect(mapRef.value!.setCenterMarker).toHaveBeenCalledWith('a', [0, 0], expect.objectContaining({ draggable: true }))
     expect(mapRef.value!.setRadiusHandle).toHaveBeenCalledWith('a', expect.any(Array), expect.objectContaining({ draggable: true }))
@@ -104,10 +104,10 @@ describe('useInteractiveMarkers', () => {
 
   it('updateMarkersForCircle removes markers when dragging is disabled', () => {
     const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a' })])
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
+    const mapRef = ref<MapCommands | null>(createMockMap())
     const { updateMarkersForCircle } = useInteractiveMarkers(
       { ...defaultOpts, draggableCenter: false, draggableRadius: false },
-      circles, ref(null), mapRef, makeCallbacks(),
+      circles, ref(null), () => mapRef.value, makeCallbacks(),
     )
     updateMarkersForCircle('a')
     expect(mapRef.value!.removeCenterMarker).toHaveBeenCalledWith('a')
@@ -117,8 +117,8 @@ describe('useInteractiveMarkers', () => {
 
   it('updateMarkersForCircle does nothing for an unknown id', () => {
     const circles = ref<RadiusCircleState[]>([])
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
-    const { updateMarkersForCircle } = useInteractiveMarkers(defaultOpts, circles, ref(null), mapRef, makeCallbacks())
+    const mapRef = ref<MapCommands | null>(createMockMap())
+    const { updateMarkersForCircle } = useInteractiveMarkers(defaultOpts, circles, ref(null), () => mapRef.value, makeCallbacks())
     expect(() => updateMarkersForCircle('missing')).not.toThrow()
     expect(mapRef.value!.setCenterMarker).not.toHaveBeenCalled()
   })
@@ -126,9 +126,9 @@ describe('useInteractiveMarkers', () => {
   it('center marker onDragEnd updates that circle, selects it, clears its name, and emits state', () => {
     const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a' }), makeCircle({ id: 'b', center: [5, 5] })])
     const selectedCircleId = ref<string | null>('b')
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
+    const mapRef = ref<MapCommands | null>(createMockMap())
     const cb = makeCallbacks()
-    const { updateMarkersForCircle } = useInteractiveMarkers(defaultOpts, circles, selectedCircleId, mapRef, cb)
+    const { updateMarkersForCircle } = useInteractiveMarkers(defaultOpts, circles, selectedCircleId, () => mapRef.value, cb)
     updateMarkersForCircle('a')
     const dragOpts = (mapRef.value!.setCenterMarker as ReturnType<typeof vi.fn>).mock.calls[0][2]
     dragOpts.onDragEnd([7, 8])
@@ -142,11 +142,11 @@ describe('useInteractiveMarkers', () => {
   it('radius handle onDragEnd clamps the radius of that circle and hides the tooltip', () => {
     const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a', center: [0, 0] })])
     const selectedCircleId = ref<string | null>(null)
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
+    const mapRef = ref<MapCommands | null>(createMockMap())
     const cb = makeCallbacks()
     const { updateMarkersForCircle } = useInteractiveMarkers(
       { ...defaultOpts, minRadius: 5, maxRadius: 100 },
-      circles, selectedCircleId, mapRef, cb,
+      circles, selectedCircleId, () => mapRef.value, cb,
     )
     updateMarkersForCircle('a')
     const dragOpts = (mapRef.value!.setRadiusHandle as ReturnType<typeof vi.fn>).mock.calls[0][2]
@@ -159,9 +159,9 @@ describe('useInteractiveMarkers', () => {
 
   it('onRadiusBlur clamps and rounds the given circle and emits state', () => {
     const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a', radiusKm: 500 })])
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
+    const mapRef = ref<MapCommands | null>(createMockMap())
     const cb = makeCallbacks()
-    const { onRadiusBlur } = useInteractiveMarkers({ ...defaultOpts, maxRadius: 100 }, circles, ref(null), mapRef, cb)
+    const { onRadiusBlur } = useInteractiveMarkers({ ...defaultOpts, maxRadius: 100 }, circles, ref(null), () => mapRef.value, cb)
     onRadiusBlur('a')
     expect(circles.value.find((c) => c.id === 'a')!.radiusKm).toBe(100)
     expect(cb.emitState).toHaveBeenCalledTimes(1)
@@ -169,8 +169,8 @@ describe('useInteractiveMarkers', () => {
 
   it('removeCircleMarkers removes the center marker, radius handle, and line for that id', () => {
     const circles = ref<RadiusCircleState[]>([])
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
-    const { removeCircleMarkers } = useInteractiveMarkers(defaultOpts, circles, ref(null), mapRef, makeCallbacks())
+    const mapRef = ref<MapCommands | null>(createMockMap())
+    const { removeCircleMarkers } = useInteractiveMarkers(defaultOpts, circles, ref(null), () => mapRef.value, makeCallbacks())
     removeCircleMarkers('a')
     expect(mapRef.value!.removeCenterMarker).toHaveBeenCalledWith('a')
     expect(mapRef.value!.removeRadiusHandle).toHaveBeenCalledWith('a')
@@ -179,9 +179,9 @@ describe('useInteractiveMarkers', () => {
 
   it('handles a null mapRef gracefully (no errors)', () => {
     const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a' })])
-    const mapRef = ref<MapContainerApi | null>(null)
+    const mapRef = ref<MapCommands | null>(null)
     const { renderAllCircles, updateMarkersForCircle, onRadiusBlur, removeCircleMarkers } =
-      useInteractiveMarkers(defaultOpts, circles, ref(null), mapRef, makeCallbacks())
+      useInteractiveMarkers(defaultOpts, circles, ref(null), () => mapRef.value, makeCallbacks())
     expect(() => {
       renderAllCircles()
       updateMarkersForCircle('a')
@@ -192,10 +192,10 @@ describe('useInteractiveMarkers', () => {
 
   it('onRadiusBlur clamps, rounds, and fits the camera once', () => {
     const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a', radiusKm: 12.7 })])
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
+    const mapRef = ref<MapCommands | null>(createMockMap())
     const cb = makeCallbacks()
     cb.fitBounds = vi.fn()
-    const { onRadiusBlur } = useInteractiveMarkers(defaultOpts, circles, ref(null), mapRef, cb)
+    const { onRadiusBlur } = useInteractiveMarkers(defaultOpts, circles, ref(null), () => mapRef.value, cb)
     onRadiusBlur('a')
     expect(circles.value[0].radiusKm).toBe(13)
     expect(cb.fitBounds).toHaveBeenCalledTimes(1)
@@ -212,8 +212,8 @@ describe('useInteractiveMarkers drag throttling', () => {
     vi.useRealTimers()
   })
 
-  function startDrag(circles: ReturnType<typeof ref<RadiusCircleState[]>>, mapRef: ReturnType<typeof ref<MapContainerApi | null>>) {
-    const api = useInteractiveMarkers(defaultOpts, circles as never, ref(null), mapRef as never, makeCallbacks())
+  function startDrag(circles: ReturnType<typeof ref<RadiusCircleState[]>>, mapRef: ReturnType<typeof ref<MapCommands | null>>) {
+    const api = useInteractiveMarkers(defaultOpts, circles as never, ref(null), () => mapRef.value, makeCallbacks())
     api.updateMarkersForCircle('a')
     const centerOpts = (mapRef.value!.setCenterMarker as ReturnType<typeof vi.fn>).mock.calls[0][2]
     const radiusOpts = (mapRef.value!.setRadiusHandle as ReturnType<typeof vi.fn>).mock.calls[0][2]
@@ -222,7 +222,7 @@ describe('useInteractiveMarkers drag throttling', () => {
 
   it('radius drag writes reactive state at most once per window, rounded, while the tooltip tracks every tick', () => {
     const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a', center: [0, 0], radiusKm: 10 })])
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
+    const mapRef = ref<MapCommands | null>(createMockMap())
     const { radiusOpts } = startDrag(circles, mapRef)
 
     for (let i = 0; i < 5; i++) {
@@ -242,7 +242,7 @@ describe('useInteractiveMarkers drag throttling', () => {
 
   it('center drag only commits a position on a throttled tick', () => {
     const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a', center: [0, 0] })])
-    const mapRef = ref<MapContainerApi | null>(createMockMap())
+    const mapRef = ref<MapCommands | null>(createMockMap())
     const { centerOpts } = startDrag(circles, mapRef)
 
     centerOpts.onDrag([1, 1])

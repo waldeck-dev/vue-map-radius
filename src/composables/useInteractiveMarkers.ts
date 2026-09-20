@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import type { GeoJSON } from 'geojson'
+import type { MapContainerApi, MapCommands } from './useMap'
 import { circleToPolygon, haversineDistance, destinationPoint, bearingTo, hexToRgba } from '../utils/geo'
 import { clampRadius } from '../utils/radius'
 
@@ -36,25 +37,7 @@ export interface InteractiveMarkerOptions {
   showRadiusTooltip: boolean
 }
 
-export interface MapContainerApi {
-  mapReady?: boolean
-  clearCircle: () => void
-  updateCircle: (data: GeoJSON.Feature | GeoJSON.FeatureCollection) => void
-  updatePolygon: (data: GeoJSON.Feature | GeoJSON.FeatureCollection) => void
-  clearPolygon: () => void
-  setVisibility: (mode: string) => void
-  fitBounds: (bbox: [number, number, number, number]) => void
-  flyTo: (center: [number, number], zoom?: number) => void
-  setCenterMarker: (id: string, pos: [number, number], opts: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void }) => void
-  removeCenterMarker: (id: string) => void
-  setRadiusHandle: (id: string, pos: [number, number], opts: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void }) => void
-  updateRadiusHandlePosition: (id: string, pos: [number, number]) => void
-  removeRadiusHandle: (id: string) => void
-  setRadiusLine: (id: string, from: [number, number], to: [number, number], color?: string) => void
-  removeRadiusLine: (id: string) => void
-  setRadiusTooltip: (text: string, pos: [number, number]) => void
-  hideRadiusTooltip: () => void
-}
+export type { MapContainerApi, MapCommands }
 
 function roundToStep(value: number, step: number): number {
   if (step <= 0) return value
@@ -67,7 +50,8 @@ export function useInteractiveMarkers(
   opts: InteractiveMarkerOptions,
   circles: Ref<RadiusCircleState[]>,
   selectedCircleId: Ref<string | null>,
-  mapRef: Ref<MapContainerApi | null>,
+  /** Getter rather than a Ref, so a component's template ref needs no cast. */
+  getMap: () => MapCommands | null | undefined,
   callbacks: InteractiveMarkerCallbacks,
 ) {
   const lastCenterDragUpdate = new Map<string, number>()
@@ -97,10 +81,10 @@ export function useInteractiveMarkers(
 
   function renderAllCircles() {
     if (circles.value.length === 0) {
-      mapRef.value?.clearCircle()
+      getMap()?.clearCircle()
       return
     }
-    mapRef.value?.updateCircle({
+    getMap()?.updateCircle({
       type: 'FeatureCollection',
       features: circles.value.map(toCircleFeature),
     })
@@ -121,7 +105,7 @@ export function useInteractiveMarkers(
 
   function updateMarkersForCircle(id: string) {
     const c = findCircle(id)
-    const mc = mapRef.value
+    const mc = getMap()
     if (!c || !mc) return
 
     const handlers = handlersFor(id)
@@ -148,9 +132,9 @@ export function useInteractiveMarkers(
   }
 
   function removeCircleMarkers(id: string) {
-    mapRef.value?.removeCenterMarker(id)
-    mapRef.value?.removeRadiusHandle(id)
-    mapRef.value?.removeRadiusLine(id)
+    getMap()?.removeCenterMarker(id)
+    getMap()?.removeRadiusHandle(id)
+    getMap()?.removeRadiusLine(id)
     lastCenterDragUpdate.delete(id)
     lastRadiusDragUpdate.delete(id)
     featureCache.delete(id)
@@ -170,8 +154,8 @@ export function useInteractiveMarkers(
       selectedCircleId.value = id
       renderAllCircles()
       const handlePos = destinationPoint(pos, c.radiusKm, c.bearing)
-      mapRef.value?.updateRadiusHandlePosition(id, handlePos)
-      mapRef.value?.setRadiusLine(id, pos, handlePos, c.color)
+      getMap()?.updateRadiusHandlePosition(id, handlePos)
+      getMap()?.setRadiusLine(id, pos, handlePos, c.color)
     }
 
     function onDragEnd(pos: [number, number]) {
@@ -195,7 +179,7 @@ export function useInteractiveMarkers(
       const clamped = clampRadius(haversineDistance(c.center, pos), opts.minRadius, opts.maxRadius)
       // The tooltip tracks the pointer unthrottled; reactive state does not.
       if (opts.showRadiusTooltip) {
-        mapRef.value?.setRadiusTooltip(roundToStep(clamped, opts.radiusStep) + ' km', pos)
+        getMap()?.setRadiusTooltip(roundToStep(clamped, opts.radiusStep) + ' km', pos)
       }
       const now = Date.now()
       if (now - (lastRadiusDragUpdate.get(id) ?? 0) < DRAG_THROTTLE_MS) return
@@ -205,7 +189,7 @@ export function useInteractiveMarkers(
       c.radiusKm = roundToStep(clamped, opts.radiusStep)
       selectedCircleId.value = id
       renderAllCircles()
-      mapRef.value?.setRadiusLine(id, c.center, pos, c.color)
+      getMap()?.setRadiusLine(id, c.center, pos, c.color)
     }
 
     function onDragEnd(pos: [number, number]) {
@@ -215,7 +199,7 @@ export function useInteractiveMarkers(
       const clamped = clampRadius(haversineDistance(c.center, pos), opts.minRadius, opts.maxRadius)
       c.radiusKm = roundToStep(clamped, opts.radiusStep)
       selectedCircleId.value = id
-      mapRef.value?.hideRadiusTooltip()
+      getMap()?.hideRadiusTooltip()
       renderAllCircles()
       updateMarkersForCircle(id)
       callbacks.emitState()

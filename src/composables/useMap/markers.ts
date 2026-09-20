@@ -58,10 +58,6 @@ export function useMapMarkers(map: Ref<maplibregl.Map | null>, paintOptions?: Ma
     }
   }
 
-  function updateCenterMarkerPosition(id: string, lngLat: [number, number]) {
-    centerMarkers.get(id)?.setLngLat(lngLat)
-  }
-
   function removeCenterMarker(id: string) {
     centerMarkers.get(id)?.remove()
     centerMarkers.delete(id)
@@ -210,7 +206,6 @@ export function useMapMarkers(map: Ref<maplibregl.Map | null>, paintOptions?: Ma
 
   return {
     setCenterMarker,
-    updateCenterMarkerPosition,
     removeCenterMarker,
     setRadiusHandle,
     updateRadiusHandlePosition,

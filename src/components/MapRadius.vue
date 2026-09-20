@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, shallowRef, watch, computed, nextTick, toRaw } from 'vue'
-import type { Ref } from 'vue'
 import type { Mode, GeocodingResult, MapRadiusState, MapRadiusZone, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions, MapRadiusPaintOptions, MapRadiusZoneListOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
 import { useGeocoding } from '../composables/useGeocoding'
@@ -8,7 +7,7 @@ import { useGeoJSON } from '../composables/useGeoJSON'
 import { circleToPolygon, toGeoJSON, hexToRgba, getPolygonBounds, mergeToMultiPolygon, splitOutlyingParts } from '../utils/geo'
 import { getValidationMessage } from '../utils/radius'
 import { useInteractiveMarkers } from '../composables/useInteractiveMarkers'
-import type { MapContainerApi, RadiusCircleState } from '../composables/useInteractiveMarkers'
+import type { RadiusCircleState } from '../composables/useInteractiveMarkers'
 import SearchBar from './subcomponents/VMPSearchBar.vue'
 import ModeToggle from './subcomponents/VMPModeToggle.vue'
 import RadiusInput from './subcomponents/VMPRadiusInput.vue'
@@ -217,7 +216,7 @@ const {
   },
   circles,
   selectedCircleId,
-  mapContainerRef as unknown as Ref<MapContainerApi | null>,
+  () => mapContainerRef.value,
   {
     emitState,
     clearName,

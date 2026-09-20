@@ -80,7 +80,6 @@ describe('useMapMarkers', () => {
   it('returns all expected functions', () => {
     const m = useMapMarkers(mapRef)
     expect(m.setCenterMarker).toBeInstanceOf(Function)
-    expect(m.updateCenterMarkerPosition).toBeInstanceOf(Function)
     expect(m.removeCenterMarker).toBeInstanceOf(Function)
     expect(m.setRadiusHandle).toBeInstanceOf(Function)
     expect(m.updateRadiusHandlePosition).toBeInstanceOf(Function)
@@ -97,7 +96,6 @@ describe('useMapMarkers', () => {
     const m = useMapMarkers(mapRef)
     expect(() => {
       m.setCenterMarker('a', [0, 0])
-      m.updateCenterMarkerPosition('a', [1, 1])
       m.removeCenterMarker('a')
       m.setRadiusHandle('a', [0, 0])
       m.updateRadiusHandlePosition('a', [1, 1])

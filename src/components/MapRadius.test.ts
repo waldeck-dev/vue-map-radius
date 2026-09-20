@@ -20,7 +20,6 @@ function createMapStub() {
     fitBounds: vi.fn(),
     flyTo: vi.fn(),
     setCenterMarker: vi.fn(),
-    updateCenterMarkerPosition: vi.fn(),
     removeCenterMarker: vi.fn(),
     setRadiusHandle: vi.fn(),
     updateRadiusHandlePosition: vi.fn(),

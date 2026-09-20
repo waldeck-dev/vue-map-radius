@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted, useId } from 'vue'
 import { useMap } from '../../composables/useMap'
 import type { MapRadiusPaintOptions } from '../../types'
 
@@ -12,71 +12,22 @@ const props = defineProps<{
   paintOptions?: MapRadiusPaintOptions
 }>()
 
-const containerId = 'vmr-map-' + Math.random().toString(36).slice(2, 8)
-const containerRef = ref<HTMLDivElement>()
+const containerId = useId()
 
-const {
-  mapReady,
-  init,
-  updateCircle,
-  updatePolygon,
-  setVisibility,
-  fitBounds,
-  flyTo,
-  clearCircle,
-  clearPolygon,
-  destroy,
-
-  setCenterMarker,
-  updateCenterMarkerPosition,
-  removeCenterMarker,
-
-  setRadiusHandle,
-  updateRadiusHandlePosition,
-  removeRadiusHandle,
-
-  setRadiusLine,
-  removeRadiusLine,
-
-  setRadiusTooltip,
-  hideRadiusTooltip,
-} = useMap(containerId, props.apiKey, props.center, props.zoom, props.mapStyle, props.paintOptions)
+// Expose the whole map surface rather than a hand-copied subset: one list that
+// cannot drift from what useMap actually returns.
+const map = useMap(containerId, props.apiKey, props.center, props.zoom, props.mapStyle, props.paintOptions)
 
 onMounted(() => {
-  init()
+  map.init()
 })
 
-defineExpose({
-  mapReady,
-  updateCircle,
-  updatePolygon,
-  setVisibility,
-  fitBounds,
-  flyTo,
-  clearCircle,
-  clearPolygon,
-  destroy,
-
-  setCenterMarker,
-  updateCenterMarkerPosition,
-  removeCenterMarker,
-
-  setRadiusHandle,
-  updateRadiusHandlePosition,
-  removeRadiusHandle,
-
-  setRadiusLine,
-  removeRadiusLine,
-
-  setRadiusTooltip,
-  hideRadiusTooltip,
-})
+defineExpose(map)
 </script>
 
 <template>
   <div
     :id="containerId"
-    ref="containerRef"
     class="vmr-map-wrapper"
     :style="{ height }"
     role="application"

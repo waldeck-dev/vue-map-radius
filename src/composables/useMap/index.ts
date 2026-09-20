@@ -1,5 +1,5 @@
 import { ref, onUnmounted } from 'vue'
-import type { Ref } from 'vue'
+import type { Ref, ShallowUnwrapRef } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMapLayers, buildStyleUrl } from './layers'
@@ -8,33 +8,27 @@ import type { MapRadiusPaintOptions } from '../../types'
 
 export { buildStyleUrl }
 
-export interface UseMapReturn {
-  map: Ref<maplibregl.Map | null>
-  mapReady: Ref<boolean>
-  init: () => void
-  updateCircle: (data: GeoJSON.Feature | GeoJSON.FeatureCollection) => void
-  updatePolygon: (data: GeoJSON.Feature | GeoJSON.FeatureCollection) => void
-  setVisibility: (mode: 'radius' | 'polygon') => void
-  fitBounds: (bbox: [number, number, number, number], padding?: number) => void
-  flyTo: (c: [number, number], z?: number) => void
-  clearCircle: () => void
-  clearPolygon: () => void
-  destroy: () => void
+/**
+ * The map surface, derived from the two composables that implement it rather
+ * than restated by hand. It used to be written out four times (this interface,
+ * two destructures and a defineExpose list) plus a fifth, already-drifted copy
+ * in useInteractiveMarkers, bridged by an `as unknown as` that turned off
+ * checking on the only channel between the component and MapLibre.
+ */
+export type UseMapReturn =
+  Omit<ReturnType<typeof useMapLayers>, 'setLayersVisibility' | 'destroyMap'>
+  & Omit<ReturnType<typeof useMapMarkers>, 'setMarkersVisibility' | 'destroyMarkers'>
+  & {
+    map: Ref<maplibregl.Map | null>
+    setVisibility: (mode: 'radius' | 'polygon') => void
+    destroy: () => void
+  }
 
-  setCenterMarker: (id: string, lngLat: [number, number], opts?: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void }) => void
-  updateCenterMarkerPosition: (id: string, lngLat: [number, number]) => void
-  removeCenterMarker: (id: string) => void
+/** What `defineExpose` of a UseMapReturn presents to a parent: refs unwrapped. */
+export type MapContainerApi = ShallowUnwrapRef<UseMapReturn>
 
-  setRadiusHandle: (id: string, lngLat: [number, number], opts?: { draggable?: boolean; onDragEnd?: (pos: [number, number]) => void; onDrag?: (pos: [number, number]) => void }) => void
-  updateRadiusHandlePosition: (id: string, lngLat: [number, number]) => void
-  removeRadiusHandle: (id: string) => void
-
-  setRadiusLine: (id: string, from: [number, number], to: [number, number], color?: string) => void
-  removeRadiusLine: (id: string) => void
-
-  setRadiusTooltip: (text: string, lngLat: [number, number]) => void
-  hideRadiusTooltip: () => void
-}
+/** The drawing surface alone — no map instance, no lifecycle, no readiness. */
+export type MapCommands = Omit<MapContainerApi, 'map' | 'init' | 'destroy' | 'mapReady'>
 
 export function useMap(
   containerId: string,
@@ -46,33 +40,8 @@ export function useMap(
 ): UseMapReturn {
   const map = ref<maplibregl.Map | null>(null) as Ref<maplibregl.Map | null>
 
-  const {
-    mapReady,
-    init,
-    updateCircle,
-    updatePolygon,
-    setLayersVisibility,
-    clearCircle,
-    clearPolygon,
-    fitBounds,
-    flyTo,
-    destroyMap,
-  } = useMapLayers(map, containerId, apiKey, center, zoom, styleUrl, paintOptions)
-
-  const {
-    setCenterMarker,
-    updateCenterMarkerPosition,
-    removeCenterMarker,
-    setRadiusHandle,
-    updateRadiusHandlePosition,
-    removeRadiusHandle,
-    setRadiusLine,
-    removeRadiusLine,
-    setRadiusTooltip,
-    hideRadiusTooltip,
-    setMarkersVisibility,
-    destroyMarkers,
-  } = useMapMarkers(map, paintOptions)
+  const { setLayersVisibility, destroyMap, ...layers } = useMapLayers(map, containerId, apiKey, center, zoom, styleUrl, paintOptions)
+  const { setMarkersVisibility, destroyMarkers, ...markers } = useMapMarkers(map, paintOptions)
 
   function setVisibility(mode: 'radius' | 'polygon') {
     setLayersVisibility(mode)
@@ -83,32 +52,10 @@ export function useMap(
     destroyMarkers()
     destroyMap()
     map.value = null
-    mapReady.value = false
+    layers.mapReady.value = false
   }
 
   onUnmounted(destroy)
 
-  return {
-    map,
-    mapReady,
-    init,
-    updateCircle,
-    updatePolygon,
-    setVisibility,
-    fitBounds,
-    flyTo,
-    clearCircle,
-    clearPolygon,
-    destroy,
-    setCenterMarker,
-    updateCenterMarkerPosition,
-    removeCenterMarker,
-    setRadiusHandle,
-    updateRadiusHandlePosition,
-    removeRadiusHandle,
-    setRadiusLine,
-    removeRadiusLine,
-    setRadiusTooltip,
-    hideRadiusTooltip,
-  }
+  return { map, ...layers, ...markers, setVisibility, destroy }
 }
