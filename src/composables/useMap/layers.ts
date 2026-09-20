@@ -143,7 +143,13 @@ export function useMapLayers(
   }
 
   function fitBounds(bbox: [number, number, number, number], padding = 50) {
-    map.value?.fitBounds(bbox, { padding })
+    const [west, south, east, north] = bbox
+    // west > east means the box crosses the anti-meridian; MapLibre reads that
+    // correctly only if the eastern edge is expressed past 180.
+    map.value?.fitBounds(
+      west > east ? [[west, south], [east + 360, north]] : [[west, south], [east, north]],
+      { padding },
+    )
   }
 
   function flyTo(c: [number, number], z?: number) {

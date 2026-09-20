@@ -12,29 +12,62 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
+const EARTH_RADIUS_KM = 6371
+
+/** Normalises a longitude into [-180, 180]. */
+function wrapLongitude(lng: number): number {
+  const wrapped = lng % 360
+  return wrapped > 180 ? wrapped - 360 : wrapped < -180 ? wrapped + 360 : wrapped
+}
+
+/**
+ * A true small circle on the sphere: every vertex is `radiusKm` away from the
+ * centre, measured the same way haversineDistance measures it. An
+ * equirectangular approximation drifts with latitude — at 70°N a 300 km circle
+ * comes out between 292 and 307 km wide — which made the drawn circle disagree
+ * with the radius the UI reported.
+ */
 export function circleToPolygon(
   center: [number, number],
   radiusKm: number,
   points: number = 64,
 ): [number, number][] {
-  const [lng, lat] = center
-  const kmPerDegree = 111.32
-  const latRad = (lat * Math.PI) / 180
-  const lngKmPerDegree = kmPerDegree * Math.cos(latRad)
+  if (!Number.isFinite(radiusKm) || radiusKm < 0) return []
+  const segments = Math.max(3, Math.floor(points))
+  const lngRad = (center[0] * Math.PI) / 180
+  const latRad = (center[1] * Math.PI) / 180
+  const angular = radiusKm / EARTH_RADIUS_KM
+  const sinD = Math.sin(angular)
+  const cosD = Math.cos(angular)
+  const sinLat = Math.sin(latRad)
+  const cosLat = Math.cos(latRad)
 
   const coordinates: [number, number][] = []
-  for (let i = 0; i < points; i++) {
-    const angle = (i / points) * 360
-    const angleRad = (angle * Math.PI) / 180
-    const dx = radiusKm * Math.sin(angleRad)
-    const dy = radiusKm * Math.cos(angleRad)
-    const newLng = lng + dx / lngKmPerDegree
-    const newLat = lat + dy / kmPerDegree
-    coordinates.push([newLng, newLat])
+  for (let i = 0; i < segments; i++) {
+    const bearing = (i / segments) * 2 * Math.PI
+    const sinLat2 = sinLat * cosD + cosLat * sinD * Math.cos(bearing)
+    const lat2 = Math.asin(sinLat2)
+    const lng2 = lngRad + Math.atan2(Math.sin(bearing) * sinD * cosLat, cosD - sinLat * sinLat2)
+    coordinates.push([wrapLongitude((lng2 * 180) / Math.PI), (lat2 * 180) / Math.PI])
   }
 
   coordinates.push([coordinates[0][0], coordinates[0][1]])
   return coordinates
+}
+
+/**
+ * Initial great-circle bearing in degrees from `from` to `to`, the inverse of
+ * destinationPoint. Taking atan2 of raw degree deltas instead treats one degree
+ * of longitude as one degree of latitude, which is wrong everywhere but the
+ * equator.
+ */
+export function bearingTo(from: [number, number], to: [number, number]): number {
+  const lat1 = (from[1] * Math.PI) / 180
+  const lat2 = (to[1] * Math.PI) / 180
+  const dLng = ((to[0] - from[0]) * Math.PI) / 180
+  const y = Math.sin(dLng) * Math.cos(lat2)
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng)
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360
 }
 
 export function toGeoJSON(
@@ -102,26 +135,27 @@ interface PolygonPart {
   size: number
 }
 
-// Shoelace formula on an equirectangular projection local to the ring's latitude.
+// Trapezoid area with the longitude scale taken per edge, at that edge's own
+// latitude: scaling the whole ring by its first vertex's latitude instead makes
+// a part spanning many degrees (Chile, Norway) come out well off.
 // Good enough to compare landmass sizes; not a precise geodesic area.
-function ringAreaKm2(ring: GeoJSON.Position[], refLat: number): number {
-  const kmPerDegLat = 111.32
-  const kmPerDegLng = 111.32 * Math.cos((refLat * Math.PI) / 180)
+function ringAreaKm2(ring: GeoJSON.Position[]): number {
+  const kmPerDegree = 111.32
   let sum = 0
   for (let i = 0; i < ring.length - 1; i++) {
     const [lng1, lat1] = ring[i]
     const [lng2, lat2] = ring[i + 1]
-    sum += (lng1 * kmPerDegLng) * (lat2 * kmPerDegLat) - (lng2 * kmPerDegLng) * (lat1 * kmPerDegLat)
+    const midLat = (lat1 + lat2) / 2
+    sum += wrapLongitude(lng2 - lng1) * midLat * Math.cos((midLat * Math.PI) / 180)
   }
-  return Math.abs(sum) / 2
+  return Math.abs(sum) * kmPerDegree * kmPerDegree
 }
 
 function polygonAreaKm2(polygon: GeoJSON.Polygon): number {
   const rings = polygon.coordinates
   if (rings.length === 0 || rings[0].length === 0) return 0
-  const refLat = rings[0][0][1]
-  const outer = ringAreaKm2(rings[0], refLat)
-  const holes = rings.slice(1).reduce((sum, hole) => sum + ringAreaKm2(hole, refLat), 0)
+  const outer = ringAreaKm2(rings[0])
+  const holes = rings.slice(1).reduce((sum, hole) => sum + ringAreaKm2(hole), 0)
   return Math.max(outer - holes, 0)
 }
 
@@ -321,17 +355,23 @@ export function ramerDouglasPeucker(
   return simplified
 }
 
+/**
+ * Simplifies one ring, or returns an empty ring when nothing of it survives.
+ * An island smaller than the tolerance collapses to two points, which closing
+ * turns into a zero-area triangle — better to drop it than to ship a sliver.
+ */
 function simplifyRing(
   ring: [number, number][],
   tolerance: number,
 ): [number, number][] {
-  if (ring.length <= 3) return ring
+  if (ring.length <= 3 || tolerance <= 0) return ring
   const isClosed =
     ring[0][0] === ring[ring.length - 1][0] &&
     ring[0][1] === ring[ring.length - 1][1]
   const points = isClosed ? ring.slice(0, -1) : ring
   const simplified = ramerDouglasPeucker(points, tolerance)
-  if (isClosed && simplified.length > 0) {
+  if (simplified.length < 3) return []
+  if (isClosed) {
     simplified.push([simplified[0][0], simplified[0][1]])
   }
   return simplified
@@ -346,31 +386,28 @@ export function simplifyPolygon(
 
   if (geom.type === 'Polygon') {
     const polygon = geom as GeoJSON.Polygon
-    return {
-      ...feature,
-      geometry: {
-        type: 'Polygon',
-        coordinates: polygon.coordinates.map(
-          (ring) => simplifyRing(ring as [number, number][], tolerance),
-        ),
-      },
-    }
+    const rings = simplifyRings(polygon.coordinates as [number, number][][], tolerance)
+    if (rings.length === 0) return feature
+    return { ...feature, geometry: { type: 'Polygon', coordinates: rings } }
   }
 
   if (geom.type === 'MultiPolygon') {
     const multi = geom as GeoJSON.MultiPolygon
-    return {
-      ...feature,
-      geometry: {
-        type: 'MultiPolygon',
-        coordinates: multi.coordinates.map((polygon) =>
-          polygon.map((ring) => simplifyRing(ring as [number, number][], tolerance)),
-        ),
-      },
-    }
+    const polygons = multi.coordinates
+      .map((polygon) => simplifyRings(polygon as [number, number][][], tolerance))
+      .filter((polygon) => polygon.length > 0)
+    if (polygons.length === 0) return feature
+    return { ...feature, geometry: { type: 'MultiPolygon', coordinates: polygons } }
   }
 
   return feature
+}
+
+/** Simplifies a polygon's rings, dropping the whole polygon if its outer ring vanishes. */
+function simplifyRings(rings: [number, number][][], tolerance: number): [number, number][][] {
+  const simplified = rings.map((ring) => simplifyRing(ring, tolerance))
+  if (simplified.length === 0 || simplified[0].length === 0) return []
+  return simplified.filter((ring) => ring.length > 0)
 }
 
 export function haversineDistance(
@@ -415,32 +452,53 @@ export function destinationPoint(
   return [(newLngRad * 180) / Math.PI, (newLatRad * 180) / Math.PI]
 }
 
-const polygonBoundsCache = new WeakMap<GeoJSON.Feature<GeoJSON.Geometry | null>, [number, number, number, number]>()
-
+/**
+ * Bounding box `[west, south, east, north]` of a Polygon or MultiPolygon.
+ *
+ * Longitudes are unwrapped as the ring is walked, so a shape crossing the
+ * anti-meridian (Russia, Fiji, New Zealand) yields a box that crosses it too —
+ * `west > east` — instead of the whole-globe box a naive min/max produces.
+ * Callers that hand the result to a map must understand that convention;
+ * `circleBounds` has always used it.
+ */
 export function getPolygonBounds(feature: GeoJSON.Feature<GeoJSON.Geometry | null>): [number, number, number, number] | null {
-  const cached = polygonBoundsCache.get(feature)
-  if (cached) return cached
-  if (!feature.geometry) return null
-  const coords: [number, number][] = []
-  const g = feature.geometry
-  if (g.type === 'Polygon') {
-    g.coordinates[0].forEach((c) => coords.push(c as [number, number]))
-  } else if (g.type === 'MultiPolygon') {
-    g.coordinates.forEach((poly) => poly[0].forEach((c) => coords.push(c as [number, number])))
-  } else {
-    return null
+  const geometry = feature.geometry
+  if (!geometry) return null
+
+  const rings: GeoJSON.Position[][] = geometry.type === 'Polygon'
+    ? [geometry.coordinates[0]]
+    : geometry.type === 'MultiPolygon'
+      ? geometry.coordinates.map((polygon) => polygon[0])
+      : []
+  if (rings.length === 0) return null
+
+  let anchor: number | null = null
+  let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity
+
+  for (const ring of rings) {
+    if (!ring || ring.length === 0) continue
+    // Anchor each ring within half a turn of the first one, then follow the
+    // ring vertex by vertex so a 179 -> -179 step counts as +2, not -358.
+    let unwrapped: number = anchor === null ? ring[0][0] : anchor + wrapLongitude(ring[0][0] - anchor)
+    if (anchor === null) anchor = unwrapped
+    let previous = ring[0][0]
+
+    for (let i = 0; i < ring.length; i++) {
+      if (i > 0) {
+        unwrapped += wrapLongitude(ring[i][0] - previous)
+        previous = ring[i][0]
+      }
+      const lat = ring[i][1]
+      if (unwrapped < minLng) minLng = unwrapped
+      if (unwrapped > maxLng) maxLng = unwrapped
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+    }
   }
-  if (coords.length === 0) return null
-  let minLng = coords[0][0], minLat = coords[0][1], maxLng = coords[0][0], maxLat = coords[0][1]
-  for (let i = 1; i < coords.length; i++) {
-    if (coords[i][0] < minLng) minLng = coords[i][0]
-    if (coords[i][0] > maxLng) maxLng = coords[i][0]
-    if (coords[i][1] < minLat) minLat = coords[i][1]
-    if (coords[i][1] > maxLat) maxLat = coords[i][1]
-  }
-  const result: [number, number, number, number] = [minLng, minLat, maxLng, maxLat]
-  polygonBoundsCache.set(feature, result)
-  return result
+
+  if (minLng === Infinity) return null
+  if (maxLng - minLng >= 360) return [-180, minLat, 180, maxLat]
+  return [wrapLongitude(minLng), minLat, wrapLongitude(maxLng), maxLat]
 }
 
 export function circleBounds(

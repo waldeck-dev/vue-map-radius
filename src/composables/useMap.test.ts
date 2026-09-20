@@ -352,7 +352,7 @@ describe('useMapLayers', () => {
     const l = useMapLayers(mapRef, 'c', 'k', [0, 0], 5)
     l.fitBounds([-10, -10, 10, 10])
 
-    expect(mockMap.fitBounds).toHaveBeenCalledWith([-10, -10, 10, 10], { padding: 50 })
+    expect(mockMap.fitBounds).toHaveBeenCalledWith([[-10, -10], [10, 10]], { padding: 50 })
   })
 
   it('fitBounds accepts custom padding', () => {
@@ -361,7 +361,16 @@ describe('useMapLayers', () => {
     const l = useMapLayers(mapRef, 'c', 'k', [0, 0], 5)
     l.fitBounds([-10, -10, 10, 10], 100)
 
-    expect(mockMap.fitBounds).toHaveBeenCalledWith([-10, -10, 10, 10], { padding: 100 })
+    expect(mockMap.fitBounds).toHaveBeenCalledWith([[-10, -10], [10, 10]], { padding: 100 })
+  })
+
+  it('fitBounds expresses an anti-meridian box past 180 so MapLibre reads it correctly', () => {
+    mapRef.value = mockMap as unknown as maplibregl.Map
+
+    const l = useMapLayers(mapRef, 'c', 'k', [0, 0], 5)
+    l.fitBounds([170, -20, -170, 20])
+
+    expect(mockMap.fitBounds).toHaveBeenCalledWith([[170, -20], [190, 20]], { padding: 50 })
   })
 
   it('flyTo delegates to map.flyTo', () => {

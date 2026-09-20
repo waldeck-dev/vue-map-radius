@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import type { GeoJSON } from 'geojson'
-import { circleToPolygon, haversineDistance, destinationPoint, hexToRgba } from '../utils/geo'
+import { circleToPolygon, haversineDistance, destinationPoint, bearingTo, hexToRgba } from '../utils/geo'
 import { clampRadius } from '../utils/radius'
 
 /** Minimum delay between two reactive-state writes while a marker is dragged. */
@@ -211,10 +211,7 @@ export function useInteractiveMarkers(
     function onDragEnd(pos: [number, number]) {
       const c = findCircle(id)
       if (!c) return
-      const [lng, lat] = c.center
-      const [dlng, dlat] = [pos[0] - lng, pos[1] - lat]
-      const bearing = (Math.atan2(dlng, dlat) * 180) / Math.PI
-      c.bearing = (bearing + 360) % 360
+      c.bearing = bearingTo(c.center, pos)
       const clamped = clampRadius(haversineDistance(c.center, pos), opts.minRadius, opts.maxRadius)
       c.radiusKm = roundToStep(clamped, opts.radiusStep)
       selectedCircleId.value = id

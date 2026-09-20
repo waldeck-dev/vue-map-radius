@@ -1,8 +1,34 @@
 import type { GeoJSON } from 'geojson'
 import { describe, it, expect } from 'vitest'
-import { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint, circleBounds, getPolygonBounds, mergeToMultiPolygon, splitOutlyingParts } from '../utils/geo'
+import { circleToPolygon, toGeoJSON, trimCoordPrecision, ramerDouglasPeucker, simplifyPolygon, haversineDistance, destinationPoint, bearingTo, circleBounds, getPolygonBounds, mergeToMultiPolygon, splitOutlyingParts } from '../utils/geo'
 
 describe('circleToPolygon', () => {
+  it('puts every vertex at the requested distance, even at high latitude', () => {
+    const center: [number, number] = [20, 70]
+    for (const vertex of circleToPolygon(center, 300, 64)) {
+      expect(haversineDistance(center, vertex)).toBeCloseTo(300, 0)
+    }
+  })
+
+  it('agrees with destinationPoint on the cardinal bearings', () => {
+    const center: [number, number] = [-5, 55]
+    const ring = circleToPolygon(center, 120, 4)
+    const north = destinationPoint(center, 120, 0)
+    expect(ring[0][0]).toBeCloseTo(north[0], 6)
+    expect(ring[0][1]).toBeCloseTo(north[1], 6)
+  })
+
+  it('clamps degenerate point counts instead of throwing', () => {
+    expect(() => circleToPolygon([0, 0], 10, 0)).not.toThrow()
+    const coords = circleToPolygon([0, 0], 10, 0)
+    expect(coords.length).toBeGreaterThanOrEqual(4)
+    expect(coords[coords.length - 1]).toEqual(coords[0])
+  })
+
+  it('returns an empty ring for a non-finite radius', () => {
+    expect(circleToPolygon([0, 0], Number.NaN)).toEqual([])
+  })
+
   it('should return 64 points plus closing point by default', () => {
     const coords = circleToPolygon([0, 0], 10)
     expect(coords).toHaveLength(65)
@@ -197,6 +223,29 @@ describe('simplifyPolygon', () => {
     const ring = geom.coordinates[0][0]
     expect(ring[ring.length - 1]).toEqual(ring[0])
   })
+
+  it('drops an island smaller than the tolerance instead of emitting a zero-area sliver', () => {
+    const mainland: [number, number][] = [[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]
+    const islet: [number, number][] = [[10, 10], [10.001, 10], [10.001, 10.001], [10, 10.001], [10, 10]]
+    const feature: GeoJSON.Feature = {
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'MultiPolygon', coordinates: [[mainland], [islet]] },
+    }
+    const geom = simplifyPolygon(feature, 0.025).geometry as GeoJSON.MultiPolygon
+    expect(geom.coordinates).toHaveLength(1)
+    expect(geom.coordinates[0][0]).toHaveLength(5)
+  })
+
+  it('keeps the original geometry when every ring would vanish', () => {
+    const islet: [number, number][] = [[10, 10], [10.001, 10], [10.001, 10.001], [10, 10.001], [10, 10]]
+    const feature: GeoJSON.Feature = {
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'Polygon', coordinates: [islet] },
+    }
+    expect(simplifyPolygon(feature, 0.025).geometry).toEqual(feature.geometry)
+  })
 })
 describe('haversineDistance', () => {
   it('returns 0 for same point', () => {
@@ -256,6 +305,28 @@ describe('destinationPoint', () => {
   })
 })
 
+describe('bearingTo', () => {
+  it('returns the cardinal bearings', () => {
+    expect(bearingTo([0, 0], [0, 1])).toBeCloseTo(0, 6)
+    expect(bearingTo([0, 0], [1, 0])).toBeCloseTo(90, 6)
+    expect(bearingTo([0, 0], [0, -1])).toBeCloseTo(180, 6)
+    expect(bearingTo([0, 0], [-1, 0])).toBeCloseTo(270, 6)
+  })
+
+  it('round-trips with destinationPoint away from the equator', () => {
+    const origin: [number, number] = [2.35, 48.85]
+    for (const bearing of [15, 75, 190, 300]) {
+      expect(bearingTo(origin, destinationPoint(origin, 200, bearing))).toBeCloseTo(bearing, 4)
+    }
+  })
+
+  it('does not treat a degree of longitude as a degree of latitude', () => {
+    // A planar atan2 of the raw deltas would answer exactly 45 here.
+    expect(bearingTo([0, 60], [1, 61])).toBeGreaterThan(20)
+    expect(bearingTo([0, 60], [1, 61])).toBeLessThan(30)
+  })
+})
+
 describe('getPolygonBounds', () => {
   it('returns null for null geometry', () => {
     const feature: GeoJSON.Feature<GeoJSON.Geometry | null> = { type: 'Feature', properties: {}, geometry: null }
@@ -289,6 +360,29 @@ describe('getPolygonBounds', () => {
       geometry: { type: 'Polygon', coordinates: [[]] },
     }
     expect(getPolygonBounds(feature)).toBeNull()
+  })
+
+  it('returns a crossing box for a polygon spanning the anti-meridian', () => {
+    // A naive min/max would answer [-175, -10, 178, 10]: the whole globe.
+    const feature: GeoJSON.Feature = {
+      type: 'Feature', properties: {},
+      geometry: { type: 'Polygon', coordinates: [[[178, -10], [-178, -10], [-175, 10], [178, 10], [178, -10]]] },
+    }
+    expect(getPolygonBounds(feature)).toEqual([178, -10, -175, 10])
+  })
+
+  it('anchors MultiPolygon parts sitting on both sides of the anti-meridian', () => {
+    const feature: GeoJSON.Feature = {
+      type: 'Feature', properties: {},
+      geometry: {
+        type: 'MultiPolygon',
+        coordinates: [
+          [[[177, -18], [179, -18], [179, -16], [177, -16], [177, -18]]],
+          [[[-180, -18], [-179, -18], [-179, -16], [-180, -16], [-180, -18]]],
+        ],
+      },
+    }
+    expect(getPolygonBounds(feature)).toEqual([177, -18, -179, -16])
   })
 })
 

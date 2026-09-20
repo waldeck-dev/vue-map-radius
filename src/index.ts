@@ -39,6 +39,8 @@ export { simplifyPolygon } from './utils/geo'
 export { haversineDistance } from './utils/geo'
 /** Destination coordinate given origin, distance (km), and bearing. */
 export { destinationPoint } from './utils/geo'
+/** Initial great-circle bearing (degrees) from one coordinate to another. */
+export { bearingTo } from './utils/geo'
 /** Bounding box `[w, s, e, n]` of a circle given center and radius. */
 export { circleBounds } from './utils/geo'
 /** Bounding box `[w, s, e, n]` of a GeoJSON polygon feature. */
