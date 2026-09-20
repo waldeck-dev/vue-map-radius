@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, shallowRef, watch, computed, nextTick, toRaw } from 'vue'
-import type { Mode, GeocodingResult, MapRadiusState, MapRadiusZone, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions, MapRadiusPaintOptions, MapRadiusZoneListOptions } from '../types'
+import type { Mode, GeocodingResult, MapRadiusState, MapRadiusGeometry, MapRadiusError, MapRadiusZone, MapRadiusCircleZone, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions, MapRadiusPaintOptions, MapRadiusZoneListOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
 import { useGeocoding } from '../composables/useGeocoding'
 import { useGeoJSON } from '../composables/useGeoJSON'
@@ -64,7 +64,22 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:modelValue', state: MapRadiusState): void
+  /** The merged shape of everything drawn. Derived output, never fed back in. */
+  (e: 'geometry', geometry: MapRadiusGeometry): void
+  /** The map finished loading and is ready to be driven. */
+  (e: 'ready'): void
+  (e: 'error', error: MapRadiusError): void
+  (e: 'zone-added', zone: MapRadiusZone): void
+  (e: 'zone-removed', id: string): void
+  (e: 'circle-added', circle: MapRadiusCircleZone): void
+  (e: 'circle-removed', id: string): void
+  (e: 'circle-selected', id: string | null): void
 }>()
+
+function reportError(source: MapRadiusError['source'], message: string, cause?: unknown) {
+  errorMsg.value = message
+  emit('error', { source, message, cause })
+}
 
 const { t } = useTranslation(props.locale, props.translations)
 const { search: geocodeSearch, results: searchResults, loading: searchLoading, error: searchError, fetchFeatureDetail } = useGeocoding(props.apiKey, props.locale)
@@ -106,11 +121,12 @@ function unusedZoneColor(taken: (string | undefined)[]): string {
 // Simplifying a country-sized polygon is the expensive part of adding a zone.
 // Cache the result per raw geometry so unrelated zones aren't re-simplified
 // every time the zones array changes (e.g. when another zone is added/removed).
-const zoneGeometryCache = new WeakMap<GeoJSON.Geometry, { tolerance: number; geometry: GeoJSON.Geometry }>()
-function getSimplifiedZoneGeometry(geometry: GeoJSON.Geometry, tolerance: number): GeoJSON.Geometry {
+type ZoneGeometry = GeoJSON.Polygon | GeoJSON.MultiPolygon
+const zoneGeometryCache = new WeakMap<ZoneGeometry, { tolerance: number; geometry: ZoneGeometry }>()
+function getSimplifiedZoneGeometry(geometry: ZoneGeometry, tolerance: number): ZoneGeometry {
   const cached = zoneGeometryCache.get(geometry)
   if (cached && cached.tolerance === tolerance) return cached.geometry
-  const simplified = trimPrecision(simplify(toGeoJSON(geometry), tolerance).geometry!)
+  const simplified = trimPrecision(simplify(toGeoJSON(geometry), tolerance).geometry as ZoneGeometry)
   zoneGeometryCache.set(geometry, { tolerance, geometry: simplified })
   return simplified
 }
@@ -193,8 +209,9 @@ function selectCircle(id: string) {
   selectedCircleId.value = id
   const c = circles.value.find((circle) => circle.id === id)
   if (c) mapContainerRef.value?.flyTo(c.center)
-  // The emitted center/radiusKm/name/bearing all describe the selected circle,
-  // so selection has to emit or the parent keeps reporting the previous one.
+  // selectedCircleId is part of the model, so selection has to emit or the
+  // parent keeps reporting the previous one.
+  emit('circle-selected', id)
   emitState()
 }
 
@@ -248,7 +265,7 @@ if (props.radiusStep < 0) {
 
 if (!props.apiKey) {
   console.warn('[vue-map-radius] MapTiler API key is required')
-  errorMsg.value = t('error.noApiKey')
+  reportError('config', t('error.noApiKey'))
 }
 
 watch(searchQuery, (val) => {
@@ -267,7 +284,7 @@ watch(searchQuery, (val) => {
 // its error ref and nobody read it, so a bad key or a rate limit was reported
 // to the user as "no results found".
 watch(searchError, (message) => {
-  if (message) errorMsg.value = message
+  if (message) reportError('geocoding-search', message)
 })
 
 function hydrate(state: MapRadiusState) {
@@ -290,18 +307,19 @@ function hydrate(state: MapRadiusState) {
       name: c.name,
       center: c.center,
       radiusKm: c.radiusKm,
-      bearing: 90,
+      bearing: c.bearing ?? 90,
       color: c.color ?? nextZoneColor(i),
     }))
-    selectedCircleId.value = circles.value[0]?.id ?? null
+    const selected = state.selectedCircleId
+    selectedCircleId.value = selected && circles.value.some((c) => c.id === selected)
+      ? selected
+      : circles.value[0]?.id ?? null
   } else {
     circles.value.forEach((c) => removeCircleMarkers(c.id))
     circles.value = []
     selectedCircleId.value = null
-    centerPoint.value = state.center || null
-    zones.value = state.zones
-      ? state.zones.map((z, i) => ({ ...z, color: z.color ?? nextZoneColor(i) }))
-      : []
+    centerPoint.value = state.center ?? null
+    zones.value = (state.zones ?? []).map((z, i) => ({ ...z, color: z.color ?? nextZoneColor(i) }))
   }
 
   renderCurrentState()
@@ -313,26 +331,37 @@ function clearName(id: string) {
   if (c) c.name = null
 }
 
+/** The merged shape of everything drawn, plus a label for it. Derived output. */
+function getGeometry(): MapRadiusGeometry {
+  if (activeMode.value === 'radius') {
+    const feature = radiusPolygonFeature.value
+    return {
+      feature: feature ? trimPrecision(feature) as GeoJSON.Feature<GeoJSON.MultiPolygon> : null,
+      name: selectedCircle.value?.name ?? null,
+    }
+  }
+  return {
+    feature: polygonFeature.value as GeoJSON.Feature<GeoJSON.MultiPolygon> | null,
+    name: zonesName.value,
+  }
+}
+
 function emitState() {
   if (internalUpdating.value) return
-  const state: MapRadiusState = {
-    mode: activeMode.value,
-    center: activeMode.value === 'radius' ? (selectedCircle.value?.center ?? null) : centerPoint.value,
-    radiusKm: activeMode.value === 'radius' ? (selectedCircle.value?.radiusKm ?? 0) : 0,
-    polygon: activeMode.value === 'radius'
-      ? (radiusPolygonFeature.value ? trimPrecision(radiusPolygonFeature.value) : null)
-      : activeMode.value === 'polygon'
-        ? polygonFeature.value
-        : null,
-    name: activeMode.value === 'radius' ? (selectedCircle.value?.name ?? null) : zonesName.value,
-    zones: activeMode.value === 'polygon' ? zones.value.map(toOutputZone) : [],
-    circles: activeMode.value === 'radius'
-      ? circles.value.map((c) => ({ id: c.id, name: c.name, center: c.center, radiusKm: c.radiusKm, color: c.color }))
-      : [],
-    bearing: activeMode.value === 'radius' ? selectedCircle.value?.bearing : undefined,
-  }
+  const state: MapRadiusState = activeMode.value === 'radius'
+    ? {
+        mode: 'radius',
+        circles: circles.value.map((c) => ({ id: c.id, name: c.name, center: c.center, radiusKm: c.radiusKm, color: c.color, bearing: c.bearing })),
+        selectedCircleId: selectedCircleId.value,
+      }
+    : {
+        mode: 'polygon',
+        zones: zones.value.map(toOutputZone),
+        center: centerPoint.value,
+      }
   lastEmitted = state
   emit('update:modelValue', state)
+  emit('geometry', getGeometry())
 }
 
 watch(() => props.modelValue, (val) => {
@@ -348,9 +377,9 @@ watch(() => props.modelValue, (val) => {
 }, { immediate: true })
 
 watch(() => mapContainerRef.value?.mapReady, (ready) => {
-  if (ready && props.modelValue) {
-    renderCurrentState()
-  }
+  if (!ready) return
+  if (props.modelValue) renderCurrentState()
+  emit('ready')
 })
 
 async function onSelect(result: GeocodingResult) {
@@ -368,6 +397,7 @@ async function onSelect(result: GeocodingResult) {
       color: unusedZoneColor(circles.value.map((c) => c.color)),
     }
     circles.value = [...circles.value, newCircle]
+    emit('circle-added', { id: newCircle.id, name: newCircle.name, center: newCircle.center, radiusKm: newCircle.radiusKm, color: newCircle.color, bearing: newCircle.bearing })
     selectedCircleId.value = newCircle.id
     searchQuery.value = ''
     renderCircle(newCircle.id)
@@ -402,7 +432,9 @@ async function onSelect(result: GeocodingResult) {
         }).main
         : feature.geometry
 
-      zones.value = [...zones.value, { id: result.id, name: feature.text, geometry: mainGeometry, color: unusedZoneColor(zones.value.map((z) => z.color)) }]
+      const newZone: MapRadiusZone = { id: result.id, name: feature.text, geometry: mainGeometry, color: unusedZoneColor(zones.value.map((z) => z.color)) }
+      zones.value = [...zones.value, newZone]
+      emit('zone-added', newZone)
       searchQuery.value = ''
       mapContainerRef.value?.updatePolygon(zoneFeatureCollection.value)
       mapContainerRef.value?.setVisibility('polygon')
@@ -431,6 +463,7 @@ function removeZone(id: string) {
       mapContainerRef.value?.fitBounds(bbox)
     }
   }
+  emit('zone-removed', id)
   emitState()
 }
 
@@ -447,6 +480,8 @@ function removeCircleZone(id: string) {
     selectedCircleId.value = circles.value[nextIndex]?.id ?? null
     fitAllCirclesBounds()
   }
+  emit('circle-removed', id)
+  emit('circle-selected', selectedCircleId.value)
   emitState()
 }
 
@@ -510,6 +545,20 @@ const maxMsg = computed(() => {
   const v = radiusValidationMessage.value
   if (v && v.key === 'radius.maxMessage') return t(v.key, v.params)
   return undefined
+})
+
+/**
+ * The imperative escape hatch. Without it the only way to recentre the map, fit
+ * a box, add a layer of your own or call resize() after the component is
+ * revealed in a tab or drawer was to remount the whole thing.
+ */
+defineExpose({
+  /** The underlying MapLibre instance, once the map has loaded. */
+  map: computed(() => mapContainerRef.value?.map ?? null),
+  flyTo: (center: [number, number], zoom?: number) => mapContainerRef.value?.flyTo(center, zoom),
+  fitBounds: (bbox: [number, number, number, number], padding?: number) => mapContainerRef.value?.fitBounds(bbox, padding),
+  resize: () => mapContainerRef.value?.map?.resize(),
+  getGeometry,
 })
 </script>
 

@@ -124,8 +124,8 @@ export interface SplitOutlyingPartsOptions {
 }
 
 export interface SplitOutlyingPartsResult {
-  main: GeoJSON.Geometry
-  outliers: GeoJSON.Geometry[]
+  main: GeoJSON.Polygon | GeoJSON.MultiPolygon
+  outliers: (GeoJSON.Polygon | GeoJSON.MultiPolygon)[]
 }
 
 interface PolygonPart {
@@ -169,7 +169,7 @@ function toPart(coordinates: GeoJSON.Position[][]): PolygonPart {
   return { polygon, center, size }
 }
 
-function toPartGeometry(parts: PolygonPart[]): GeoJSON.Geometry {
+function toPartGeometry(parts: PolygonPart[]): GeoJSON.Polygon | GeoJSON.MultiPolygon {
   if (parts.length === 1) return parts[0].polygon
   return { type: 'MultiPolygon', coordinates: parts.map((p) => p.polygon.coordinates) }
 }
@@ -206,7 +206,7 @@ function clusterByDistance(indices: number[], parts: PolygonPart[], thresholdKm:
  * (e.g. Indonesia, Philippines) as a single "main" geometry.
  */
 export function splitOutlyingParts(
-  geometry: GeoJSON.Geometry,
+  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon,
   options: SplitOutlyingPartsOptions = {},
 ): SplitOutlyingPartsResult {
   const distanceKm = options.distanceKm ?? 400

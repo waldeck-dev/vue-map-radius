@@ -5,7 +5,7 @@ export type Mode = 'radius' | 'polygon'
 export interface MapRadiusZone {
   id: string
   name: string
-  geometry: GeoJSON.Geometry
+  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon
   /** Hex color (e.g. "#3b82f6") assigned to this zone, used on the map and the zone chip. */
   color?: string
 }
@@ -17,17 +17,41 @@ export interface MapRadiusCircleZone {
   radiusKm: number
   /** Hex color (e.g. "#3b82f6") assigned to this circle, used on the map and the zone chip. */
   color?: string
+  /** Bearing of the radius handle in degrees, so its position survives a round trip. */
+  bearing?: number
 }
 
-export interface MapRadiusState {
-  mode: Mode
-  center: [number, number] | null
-  radiusKm: number
-  polygon: GeoJSON.Feature | null
-  name: string | null
-  zones: MapRadiusZone[]
+export interface MapRadiusRadiusState {
+  mode: 'radius'
   circles: MapRadiusCircleZone[]
-  bearing?: number
+  selectedCircleId?: string | null
+}
+
+export interface MapRadiusPolygonState {
+  mode: 'polygon'
+  zones: MapRadiusZone[]
+  /** Where to centre the map when a search result turned out to have no polygon. */
+  center?: [number, number] | null
+}
+
+/**
+ * Everything the component needs to restore itself, and nothing else:
+ * `hydrate(emitted)` reproduces the state it was emitted from. The merged
+ * geometry that used to travel in this object is derived output — read it from
+ * the `geometry` event or from `getGeometry()` on the component instance.
+ */
+export type MapRadiusState = MapRadiusRadiusState | MapRadiusPolygonState
+
+/** The merged shape of everything currently drawn, emitted as derived output. */
+export interface MapRadiusGeometry {
+  feature: GeoJSON.Feature<GeoJSON.MultiPolygon> | null
+  name: string | null
+}
+
+export interface MapRadiusError {
+  source: 'config' | 'geocoding-search' | 'geocoding-detail'
+  message: string
+  cause?: unknown
 }
 
 export interface GeocodingResult {

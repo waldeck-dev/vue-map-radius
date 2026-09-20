@@ -1,21 +1,19 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import MapRadius from '../src/components/MapRadius.vue'
-import type { MapRadiusState } from '../src/types'
+// Import through the public barrel, so the playground smoke-tests what is
+// actually published rather than the source tree.
+import MapRadius from '../src/index'
+import type { MapRadiusState, MapRadiusGeometry } from '../src/index'
 
 const apiKey = import.meta.env.VITE_MAPTILER_KEY
 
-const state = ref<MapRadiusState>({
-  mode: 'radius',
-  center: null,
-  radiusKm: 20,
-  polygon: null,
-  name: null,
-  zones: [],
-  circles: []
-})
+const state = ref<MapRadiusState>({ mode: 'radius', circles: [] })
+const geometry = ref<MapRadiusGeometry | null>(null)
 
 const stateJson = computed(() => JSON.stringify(state.value, null, 2))
+const geometryJson = computed(() => geometry.value
+  ? JSON.stringify({ name: geometry.value.name, coordinates: geometry.value.feature?.geometry.coordinates.length ?? 0 }, null, 2)
+  : 'null')
 
 const center: [number, number] = [2.2137, 46.2276]
 const zoom = 5
@@ -102,14 +100,19 @@ const githubMarkSrc = `${import.meta.env.BASE_URL}github-mark.svg`
         :radius-step="1"
         locale="en"
         height="520px"
+        @geometry="geometry = $event"
       />
     </div>
 
     <div class="demo-panel">
       <div class="demo-panel-header">
-        <span class="demo-panel-title">Emitted <code>MapRadiusState</code></span>
+        <span class="demo-panel-title">Emitted <code>MapRadiusState</code> (round-trips back in)</span>
       </div>
       <pre class="demo-json">{{ stateJson }}</pre>
+      <div class="demo-panel-header">
+        <span class="demo-panel-title">Derived <code>@geometry</code> (output only)</span>
+      </div>
+      <pre class="demo-json">{{ geometryJson }}</pre>
     </div>
 
     <footer class="demo-footer">

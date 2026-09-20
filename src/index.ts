@@ -11,6 +11,10 @@ export default MapRadius
 export type {
   Mode,
   MapRadiusState,
+  MapRadiusRadiusState,
+  MapRadiusPolygonState,
+  MapRadiusGeometry,
+  MapRadiusError,
   MapRadiusZone,
   MapRadiusCircleZone,
   GeocodingResult,

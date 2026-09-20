@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { defineComponent, h, nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import MapRadius from './MapRadius.vue'
-import type { MapRadiusState } from '../types'
+import type { MapRadiusState, MapRadiusRadiusState, MapRadiusCircleZone } from '../types'
 
 /**
  * Stands in for VMPMapContainer: exposes the same surface MapRadius drives, so
@@ -39,12 +39,17 @@ function createMapStub() {
   return { api, component }
 }
 
-function radiusState(circles: MapRadiusState['circles']): MapRadiusState {
-  return { mode: 'radius', center: null, radiusKm: 0, polygon: null, name: null, zones: [], circles }
+function radiusState(circles: MapRadiusCircleZone[], selectedCircleId?: string | null): MapRadiusState {
+  return { mode: 'radius', circles, selectedCircleId }
 }
 
 function polygonState(center: [number, number] | null): MapRadiusState {
-  return { mode: 'polygon', center, radiusKm: 0, polygon: null, name: null, zones: [], circles: [] }
+  return { mode: 'polygon', zones: [], center }
+}
+
+function asRadius(state: MapRadiusState): MapRadiusRadiusState {
+  if (state.mode !== 'radius') throw new Error('expected a radius state, got ' + state.mode)
+  return state
 }
 
 async function mountMapRadius(modelValue?: MapRadiusState) {
@@ -70,7 +75,7 @@ describe('MapRadius hydration', () => {
     wrapper.vm.$emit('update:modelValue')
     await nextTick()
     const state = wrapper.props('modelValue') as MapRadiusState
-    expect(state.center).toEqual([2.35, 48.85])
+    expect(state.mode === 'polygon' && state.center).toEqual([2.35, 48.85])
   })
 
   it('clears the circle source when hydrating a radius state with no circles', async () => {
@@ -120,6 +125,69 @@ describe('MapRadius hydration', () => {
   })
 })
 
+describe('MapRadius model round trip', () => {
+  it('rebuilds the same state from a JSON copy of what it emitted', async () => {
+    const circles: MapRadiusCircleZone[] = [
+      { id: 'a', name: 'Paris', center: [2.35, 48.85], radiusKm: 20, color: '#3b82f6', bearing: 90 },
+      { id: 'b', name: 'Lyon', center: [4.83, 45.76], radiusKm: 30, color: '#ef4444', bearing: 45 },
+    ]
+    const { wrapper } = await mountMapRadius(radiusState(circles, 'b'))
+    wrapper.findComponent({ name: 'VMPZoneList' }).vm.$emit('select', 'a')
+    await nextTick()
+    const emitted = lastEmitted(wrapper)
+
+    // What a persisting consumer does: store it, reload, hand it back.
+    const { wrapper: reloaded } = await mountMapRadius(JSON.parse(JSON.stringify(emitted)))
+    reloaded.findComponent({ name: 'VMPZoneList' }).vm.$emit('select', 'b')
+    await nextTick()
+    reloaded.findComponent({ name: 'VMPZoneList' }).vm.$emit('select', 'a')
+    await nextTick()
+
+    expect(lastEmitted(reloaded)).toEqual(emitted)
+  })
+
+  it('keeps each circle handle bearing across the round trip', async () => {
+    const { wrapper } = await mountMapRadius(radiusState([
+      { id: 'a', name: 'Paris', center: [2.35, 48.85], radiusKm: 20, color: '#3b82f6', bearing: 217 },
+      { id: 'b', name: 'Lyon', center: [4.83, 45.76], radiusKm: 30, color: '#ef4444', bearing: 42 },
+    ], 'a'))
+
+    wrapper.findComponent({ name: 'VMPZoneList' }).vm.$emit('select', 'b')
+    await nextTick()
+
+    const state = asRadius(lastEmitted(wrapper))
+    expect(state.circles.map((c) => c.bearing)).toEqual([217, 42])
+  })
+
+  it('emits the derived geometry separately from the model', async () => {
+    const stub = createMapStub()
+    const onGeometry = vi.fn()
+    const wrapper = mount(MapRadius, {
+      props: {
+        apiKey: 'test-key',
+        modelValue: radiusState([
+          { id: 'a', name: 'Paris', center: [2.35, 48.85], radiusKm: 20, color: '#3b82f6' },
+          { id: 'b', name: 'Lyon', center: [4.83, 45.76], radiusKm: 30, color: '#ef4444' },
+        ]),
+        onGeometry,
+      },
+      global: { stubs: { MapContainer: stub.component } },
+    })
+    await nextTick()
+
+    wrapper.findComponent({ name: 'VMPZoneList' }).vm.$emit('select', 'b')
+    await nextTick()
+
+    expect(onGeometry).toHaveBeenCalled()
+    const geometry = onGeometry.mock.calls.at(-1)?.[0]
+    expect(geometry.feature.geometry.type).toBe('MultiPolygon')
+    expect(geometry.feature.geometry.coordinates).toHaveLength(2)
+    expect(geometry.name).toBe('Lyon')
+    // and the model itself carries no geometry
+    expect(lastEmitted(wrapper)).not.toHaveProperty('polygon')
+  })
+})
+
 describe('MapRadius selection and mode', () => {
   it('emits the newly selected circle instead of leaving the model on the previous one', async () => {
     const { wrapper } = await mountMapRadius(radiusState([
@@ -130,10 +198,10 @@ describe('MapRadius selection and mode', () => {
     wrapper.findComponent({ name: 'VMPZoneList' }).vm.$emit('select', 'b')
     await nextTick()
 
-    const state = lastEmitted(wrapper)
-    expect(state.name).toBe('Lyon')
-    expect(state.center).toEqual([4.83, 45.76])
-    expect(state.radiusKm).toBe(30)
+    const state = asRadius(lastEmitted(wrapper))
+    expect(state.selectedCircleId).toBe('b')
+    const selected = state.circles.find((c) => c.id === 'b')
+    expect(selected).toMatchObject({ name: 'Lyon', center: [4.83, 45.76], radiusKm: 30 })
   })
 
   it('tears the radius mode down once when switching to polygon, and emits once', async () => {
@@ -152,7 +220,7 @@ describe('MapRadius selection and mode', () => {
 
     const state = lastEmitted(wrapper)
     expect(state.mode).toBe('polygon')
-    expect(state.circles).toEqual([])
+    expect(state.mode === 'polygon' && state.zones).toEqual([])
   })
 
   it('ignores a mode switch to the mode already active', async () => {
