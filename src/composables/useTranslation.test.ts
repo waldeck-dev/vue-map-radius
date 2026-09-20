@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { ref } from 'vue'
 import { useTranslation } from '../composables/useTranslation'
 
 describe('useTranslation', () => {
@@ -19,7 +20,32 @@ describe('useTranslation', () => {
 
   it('should replace params in translation string', () => {
     const { t } = useTranslation('en')
-    expect(t('radius.minMessage', { min: 5 })).toBe('Minimum radius is 5 km')
+    expect(t('radius.minMessage', { min: '5 km' })).toBe('Minimum radius is 5 km')
+  })
+
+  it('should replace every occurrence of a placeholder, not just the first', () => {
+    const { t } = useTranslation('en', { en: { 'custom.key': '{n} of {n}' } })
+    expect(t('custom.key', { n: 3 })).toBe('3 of 3')
+  })
+
+  it('should leave a placeholder alone when no matching param is given', () => {
+    const { t } = useTranslation('en', { en: { 'custom.key': '{a} / {b}' } })
+    expect(t('custom.key', { a: 1 })).toBe('1 / {b}')
+  })
+
+  it('should warn once a key resolves to nothing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    useTranslation('en').t('some.missing.key')
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('some.missing.key'))
+    warn.mockRestore()
+  })
+
+  it('should follow a locale that changes after setup', () => {
+    const locale = ref('en')
+    const { t } = useTranslation(locale)
+    expect(t('search.placeholder')).toBe('Search for a location...')
+    locale.value = 'fr'
+    expect(t('search.placeholder')).toBe('Rechercher un lieu...')
   })
 
   it('should fallback to English for missing French key', () => {

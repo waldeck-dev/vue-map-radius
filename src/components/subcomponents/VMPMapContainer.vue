@@ -9,6 +9,8 @@ const props = defineProps<{
   zoom: number
   height: string
   mapStyle?: string
+  /** Accessible name for the map region. */
+  label: string
   paintOptions?: MapRadiusPaintOptions
 }>()
 
@@ -30,8 +32,8 @@ defineExpose(map)
     :id="containerId"
     class="vmr-map-wrapper"
     :style="{ height }"
-    role="application"
-    aria-label="Map"
+    role="region"
+    :aria-label="label"
   />
 </template>
 

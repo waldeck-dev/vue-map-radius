@@ -1,36 +1,47 @@
-import en from '../locales/en'
+import { computed, toValue, type MaybeRefOrGetter } from 'vue'
+import en, { type TranslationKey } from '../locales/en'
 import fr from '../locales/fr'
+
+export type { TranslationKey }
+
+/** Any built-in key, plus whatever a consumer adds through `translations`. */
+export type TranslateKey = TranslationKey | (string & {})
 
 const builtIn: Record<string, Record<string, string>> = { en, fr }
 
+const PLACEHOLDER = /\{(\w+)\}/g
+
+/**
+ * Locale and overrides are read through `toValue`, so a language switcher in
+ * the host app re-renders every label instead of freezing the one setup saw.
+ */
 export function useTranslation(
-  locale: string,
-  customTranslations: Record<string, Record<string, string>> = {},
+  locale: MaybeRefOrGetter<string>,
+  customTranslations: MaybeRefOrGetter<Record<string, Record<string, string>>> = {},
 ) {
-  const merged: Record<string, string> = {
-    ...(builtIn[locale] || builtIn['en']),
-    ...(customTranslations[locale] || {}),
-  }
-
-  const fallback: Record<string, string> = {
-    ...(builtIn['en'] || {}),
-    ...(customTranslations['en'] || {}),
-  }
-
-  function t(key: string, params?: Record<string, string | number>): string {
-    let value = merged[key]
-    if (!value) {
-      value = fallback[key]
+  const dictionaries = computed(() => {
+    const custom = toValue(customTranslations)
+    const active = toValue(locale)
+    return {
+      merged: { ...(builtIn[active] ?? en), ...(custom[active] ?? {}) },
+      fallback: { ...en, ...(custom.en ?? {}) } as Record<string, string>,
     }
-    if (!value) {
+  })
+
+  function t(key: TranslateKey, params?: Record<string, string | number>): string {
+    const { merged, fallback } = dictionaries.value
+    const template = merged[key] ?? fallback[key]
+    if (template === undefined) {
+      if (import.meta.env?.DEV) {
+        console.warn(`[vue-map-radius] missing translation for "${key}"`)
+      }
       return key
     }
-    if (params) {
-      for (const [k, v] of Object.entries(params)) {
-        value = value.replace(`{${k}}`, String(v))
-      }
-    }
-    return value
+    // Replace every occurrence, and leave an unmatched placeholder in place so
+    // the gap is visible rather than silently blank.
+    return params
+      ? template.replace(PLACEHOLDER, (whole, name: string) => (name in params ? String(params[name]) : whole))
+      : template
   }
 
   return { t }

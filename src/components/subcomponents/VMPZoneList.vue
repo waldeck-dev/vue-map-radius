@@ -2,8 +2,10 @@
 defineProps<{
   zones: { id: string; name: string; color?: string }[]
   removeLabel: string
-  disabled?: boolean
+  /** Only set in radius mode, where a chip selects which circle the input edits. */
+  selectable?: boolean
   selectedId?: string
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -24,21 +26,28 @@ const emit = defineEmits<{
       :class="{ 'vmr-zone-chip--selected': zone.id === selectedId }"
       role="listitem"
       :style="zone.color ? { borderColor: zone.color } : undefined"
-      @click="emit('select', zone.id)"
     >
-      <span
-        class="vmr-zone-chip-swatch"
-        :style="{ backgroundColor: zone.color }"
-        aria-hidden="true"
-      />
-      <span class="vmr-zone-chip-name">{{ zone.name }}</span>
+      <!-- A button, not a clickable span: the chip is how a keyboard user picks
+           which circle the radius field edits. -->
+      <component
+        :is="selectable ? 'button' : 'span'"
+        class="vmr-zone-chip-select"
+        v-bind="selectable ? { type: 'button', disabled, 'aria-pressed': zone.id === selectedId } : {}"
+        @click="selectable && emit('select', zone.id)"
+      >
+        <span
+          class="vmr-zone-chip-swatch"
+          :style="{ backgroundColor: zone.color }"
+          aria-hidden="true"
+        />
+        <span class="vmr-zone-chip-name">{{ zone.name }}</span>
+      </component>
       <button
         type="button"
         class="vmr-zone-chip-remove"
         :aria-label="`${removeLabel}: ${zone.name}`"
-        :style="zone.color ? { color: zone.color } : undefined"
         :disabled="disabled"
-        @click.stop="emit('remove', zone.id)"
+        @click="emit('remove', zone.id)"
       >
         &times;
       </button>
@@ -62,10 +71,28 @@ const emit = defineEmits<{
   background: var(--vmr-search-bg, #ffffff);
   font-size: 13px;
   color: #374151;
-  cursor: pointer;
 }
 .vmr-zone-chip--selected {
-  box-shadow: 0 0 0 2px var(--vmr-primary-color, #3b82f6);
+  box-shadow: 0 0 0 2px var(--vmr-primary-color, #2563eb);
+}
+.vmr-zone-chip-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: inherit;
+}
+button.vmr-zone-chip-select {
+  cursor: pointer;
+}
+.vmr-zone-chip-select:focus-visible,
+.vmr-zone-chip-remove:focus-visible {
+  outline: 2px solid var(--vmr-primary-color, #2563eb);
+  outline-offset: 2px;
 }
 .vmr-zone-chip-swatch {
   width: 8px;
@@ -90,8 +117,13 @@ const emit = defineEmits<{
   padding: 0 2px;
   opacity: 0.8;
 }
+.vmr-zone-chip-remove {
+  min-width: 24px;
+  min-height: 24px;
+}
 .vmr-zone-chip-remove:hover {
   opacity: 1;
+  color: var(--vmr-primary-color, #2563eb);
 }
 .vmr-zone-chip-remove:disabled {
   cursor: not-allowed;

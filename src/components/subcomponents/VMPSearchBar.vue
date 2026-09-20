@@ -1,16 +1,23 @@
 <script setup lang="ts">
 import type { GeocodingResult } from '../../types'
-import { ref, watch } from 'vue'
+import { ref, watch, useId } from 'vue'
 
 const props = defineProps<{
   modelValue: string
   placeholder: string
   results: GeocodingResult[]
   loading: boolean
-  noResultsText?: string
-  loadingText?: string
+  noResultsText: string
+  loadingText: string
+  /** Accessible name for the combobox; there is no visible <label>. */
+  label: string
   disabled?: boolean
 }>()
+
+// Per instance, so two MapRadius on one page do not cross-wire their listboxes.
+const uid = useId()
+const listboxId = `${uid}-results`
+const optionId = (index: number) => `${uid}-option-${index}`
 
 const emit = defineEmits<{
   (e: 'update:modelValue', val: string): void
@@ -76,21 +83,19 @@ watch(() => props.disabled, (disabled) => {
 </script>
 
 <template>
-  <div
-    class="vmr-search-bar"
-    role="combobox"
-    :aria-expanded="showDropdown"
-    aria-haspopup="listbox"
-  >
+  <div class="vmr-search-bar">
     <input
       :value="modelValue"
       :placeholder="placeholder"
       :disabled="disabled"
+      :aria-label="label"
+      :aria-expanded="showDropdown"
+      :aria-controls="listboxId"
+      :aria-activedescendant="activeIndex >= 0 ? optionId(activeIndex) : undefined"
       class="vmr-search-input"
-      aria-label="Search for a place"
+      role="combobox"
+      aria-haspopup="listbox"
       aria-autocomplete="list"
-      aria-controls="vmr-search-results"
-      role="searchbox"
       type="text"
       @input="onInput"
       @focus="onFocus"
@@ -99,31 +104,29 @@ watch(() => props.disabled, (disabled) => {
     >
     <div
       v-if="showDropdown && !disabled"
-      id="vmr-search-results"
+      :id="listboxId"
       class="vmr-search-dropdown"
       role="listbox"
     >
       <div
         v-if="loading"
         class="vmr-search-dropdown-item vmr-search-loading"
-        role="status"
       >
-        {{ loadingText || 'Loading...' }}
+        {{ loadingText }}
       </div>
       <div
         v-else-if="results.length === 0"
         class="vmr-search-dropdown-item vmr-search-no-results"
-        role="status"
       >
-        {{ noResultsText || 'No results found' }}
+        {{ noResultsText }}
       </div>
       <div
         v-for="(result, idx) in results"
+        :id="optionId(idx)"
         :key="result.id"
         class="vmr-search-dropdown-item"
         :class="{ 'vmr-search-dropdown-item--active': idx === activeIndex }"
         role="option"
-        :aria-label="result.placeName"
         :aria-selected="idx === activeIndex"
         @click="onSelect(result)"
       >

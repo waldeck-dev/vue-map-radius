@@ -18,14 +18,9 @@ export type {
   MapRadiusZone,
   MapRadiusCircleZone,
   GeocodingResult,
-  MapRadiusSearchOptions,
-  MapRadiusRadiusOptions,
-  MapRadiusModeToggleOptions,
-  MapRadiusMapOptions,
   MapRadiusGeoOptions,
   MapRadiusPaintOptions,
   MapRadiusInteractiveOptions,
-  MapRadiusZoneListOptions,
 } from './types'
 export type { SplitOutlyingPartsOptions, SplitOutlyingPartsResult } from './utils/geo'
 
@@ -57,6 +52,8 @@ export { splitOutlyingParts } from './utils/geo'
 export { hexToRgba } from './utils/geo'
 /** Clamp a radius value to a min/max range. */
 export { clampRadius } from './utils/radius'
+/** Format a radius in km for display, localized through Intl. */
+export { formatRadius } from './utils/radius'
 /** Get a min/max validation message for a radius value, or null when valid. */
 export { getValidationMessage } from './utils/radius'
 
@@ -66,5 +63,6 @@ export { useGeoJSON } from './composables/useGeoJSON'
 export { useGeocoding } from './composables/useGeocoding'
 /** Lightweight i18n with built-in en/fr locales and custom overrides. */
 export { useTranslation } from './composables/useTranslation'
+export type { TranslationKey } from './composables/useTranslation'
 /** MapLibre GL map lifecycle — init, layers, markers, handles, tooltip. */
 export { useMap, buildStyleUrl } from './composables/useMap'

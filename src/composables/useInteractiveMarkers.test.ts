@@ -31,6 +31,7 @@ const defaultOpts: InteractiveMarkerOptions = {
   draggableCenter: true,
   draggableRadius: true,
   showRadiusTooltip: true,
+  locale: 'en',
 }
 
 function makeCallbacks(): InteractiveMarkerCallbacks {

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, shallowRef, watch, computed, nextTick, toRaw } from 'vue'
-import type { Mode, GeocodingResult, MapRadiusState, MapRadiusGeometry, MapRadiusError, MapRadiusZone, MapRadiusCircleZone, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions, MapRadiusPaintOptions, MapRadiusZoneListOptions } from '../types'
+import type { Mode, GeocodingResult, MapRadiusState, MapRadiusGeometry, MapRadiusError, MapRadiusZone, MapRadiusCircleZone, MapRadiusInteractiveOptions, MapRadiusGeoOptions, MapRadiusPaintOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
 import { useGeocoding } from '../composables/useGeocoding'
 import { useGeoJSON } from '../composables/useGeoJSON'
 import { circleToPolygon, toGeoJSON, hexToRgba, getPolygonBounds, mergeToMultiPolygon, splitOutlyingParts } from '../utils/geo'
-import { getValidationMessage } from '../utils/radius'
+import { formatRadius, getValidationMessage } from '../utils/radius'
 import { useInteractiveMarkers } from '../composables/useInteractiveMarkers'
 import type { RadiusCircleState } from '../composables/useInteractiveMarkers'
 import SearchBar from './subcomponents/VMPSearchBar.vue'
@@ -38,16 +38,14 @@ const props = withDefaults(defineProps<{
   mode?: Mode
   height?: string
   locale?: string
+  /** Every label comes from here — override any key of the built-in en/fr dictionaries. */
   translations?: Record<string, Record<string, string>>
-  searchOptions?: MapRadiusSearchOptions
-  radiusOptions?: MapRadiusRadiusOptions
-  modeToggleOptions?: MapRadiusModeToggleOptions
-  mapOptions?: MapRadiusMapOptions
+  /** MapTiler style URL; the API key is appended when missing. */
+  mapStyle?: string
   geoOptions?: MapRadiusGeoOptions
   paintOptions?: MapRadiusPaintOptions
   modes?: Mode[]
   interactiveOptions?: MapRadiusInteractiveOptions
-  zoneListOptions?: MapRadiusZoneListOptions
 }>(), {
   center: () => [0, 20] as [number, number],
   zoom: 2,
@@ -81,7 +79,7 @@ function reportError(source: MapRadiusError['source'], message: string, cause?: 
   emit('error', { source, message, cause })
 }
 
-const { t } = useTranslation(props.locale, props.translations)
+const { t } = useTranslation(() => props.locale, () => props.translations)
 const { search: geocodeSearch, results: searchResults, loading: searchLoading, error: searchError, fetchFeatureDetail } = useGeocoding(props.apiKey, props.locale)
 const { trimPrecision, simplify } = useGeoJSON(props.geoOptions)
 
@@ -178,16 +176,26 @@ const draggableCenter = computed(() => props.interactiveOptions?.draggableCenter
 const draggableRadius = computed(() => props.interactiveOptions?.draggableRadius ?? true)
 const showRadiusTooltip = computed(() => props.interactiveOptions?.showRadiusTooltip ?? true)
 
-const searchPlaceholder = computed(() => props.searchOptions?.placeholder ?? t('search.placeholder'))
-const searchNoResultsText = computed(() => props.searchOptions?.noResultsText ?? t('info.noResults'))
-const searchLoadingText = computed(() => props.searchOptions?.loadingText ?? t('search.loading'))
-const radiusLabel = computed(() => props.radiusOptions?.label ?? t('radius.label'))
-const modeRadiusLabel = computed(() => props.modeToggleOptions?.radiusLabel ?? t('mode.radius'))
-const modePolygonLabel = computed(() => props.modeToggleOptions?.polygonLabel ?? t('mode.polygon'))
-const mapStyleUrl = computed(() => props.mapOptions?.style)
+const searchPlaceholder = computed(() => t('search.placeholder'))
+const searchAriaLabel = computed(() => t('search.ariaLabel'))
+const searchNoResultsText = computed(() => t('info.noResults'))
+const searchLoadingText = computed(() => t('search.loading'))
+const radiusLabel = computed(() => t('radius.label'))
+const modeRadiusLabel = computed(() => t('mode.radius'))
+const modePolygonLabel = computed(() => t('mode.polygon'))
+const modeAriaLabel = computed(() => t('mode.ariaLabel'))
+const mapAriaLabel = computed(() => t('map.ariaLabel'))
 const showModeToggle = computed(() => props.modes.length > 1)
-const zoneRemoveLabel = computed(() => props.zoneListOptions?.removeLabel ?? t('zone.remove'))
-const zoneLoadingLabel = computed(() => props.zoneListOptions?.loadingLabel ?? t('zone.loading'))
+const zoneRemoveLabel = computed(() => t('zone.remove'))
+const zoneLoadingLabel = computed(() => t('zone.loading'))
+
+/** What a screen reader hears while the listbox is open, mirroring the dropdown. */
+const searchStatus = computed(() => {
+  if (!searchQuery.value) return ''
+  if (searchLoading.value) return searchLoadingText.value
+  if (visibleSearchResults.value.length === 0) return searchNoResultsText.value
+  return t('search.resultCount', { count: visibleSearchResults.value.length })
+})
 
 const visibleSearchResults = computed(() =>
   activeMode.value === 'polygon'
@@ -198,7 +206,7 @@ const visibleSearchResults = computed(() =>
 const displayZones = computed(() =>
   activeMode.value === 'polygon'
     ? zones.value
-    : circles.value.map((c) => ({ id: c.id, name: c.name || `${c.radiusKm} km`, color: c.color })),
+    : circles.value.map((c) => ({ id: c.id, name: c.name || formatRadius(c.radiusKm, props.locale), color: c.color })),
 )
 function removeDisplayZone(id: string) {
   if (activeMode.value === 'polygon') removeZone(id)
@@ -223,13 +231,15 @@ const {
   removeCircleMarkers,
   onRadiusBlur,
 } = useInteractiveMarkers(
+  // Getters, not a snapshot: these mirror props, and props change.
   {
-    minRadius: props.minRadius,
-    maxRadius: props.maxRadius,
-    radiusStep: Math.max(1, props.radiusStep),
-    draggableCenter: draggableCenter.value,
-    draggableRadius: draggableRadius.value,
-    showRadiusTooltip: showRadiusTooltip.value,
+    get minRadius() { return props.minRadius },
+    get maxRadius() { return props.maxRadius },
+    get radiusStep() { return props.radiusStep > 0 ? props.radiusStep : 1 },
+    get draggableCenter() { return draggableCenter.value },
+    get draggableRadius() { return draggableRadius.value },
+    get showRadiusTooltip() { return showRadiusTooltip.value },
+    get locale() { return props.locale },
   },
   circles,
   selectedCircleId,
@@ -537,14 +547,14 @@ function setMode(mode: Mode) {
 
 const minMsg = computed(() => {
   const v = radiusValidationMessage.value
-  if (v && v.key === 'radius.minMessage') return t(v.key, v.params)
-  return undefined
+  if (v?.key !== 'radius.minMessage') return undefined
+  return t(v.key, { min: formatRadius(v.params.min, props.locale) })
 })
 
 const maxMsg = computed(() => {
   const v = radiusValidationMessage.value
-  if (v && v.key === 'radius.maxMessage') return t(v.key, v.params)
-  return undefined
+  if (v?.key !== 'radius.maxMessage') return undefined
+  return t(v.key, { max: formatRadius(v.params.max, props.locale) })
 })
 
 /**
@@ -577,6 +587,7 @@ defineExpose({
         :mode="activeMode"
         :radius-label="modeRadiusLabel"
         :polygon-label="modePolygonLabel"
+        :group-label="modeAriaLabel"
         :disabled="zoneLoading"
         @update:mode="setMode"
       />
@@ -598,11 +609,19 @@ defineExpose({
         :loading="searchLoading"
         :no-results-text="searchNoResultsText"
         :loading-text="searchLoadingText"
+        :label="searchAriaLabel"
         :disabled="zoneLoading"
         @update:model-value="searchQuery = $event"
         @select="onSelect"
       />
     </slot>
+    <p
+      class="vmr-visually-hidden"
+      role="status"
+      aria-live="polite"
+    >
+      {{ searchStatus }}
+    </p>
     <div
       v-if="zoneLoading"
       class="vmr-zone-loading"
@@ -625,6 +644,7 @@ defineExpose({
         :disabled="zoneLoading"
         :zones="displayZones"
         :remove-label="zoneRemoveLabel"
+        :selectable="activeMode === 'radius'"
         :selected-id="activeMode === 'radius' ? (selectedCircleId ?? undefined) : undefined"
         @remove="removeDisplayZone"
         @select="activeMode === 'radius' && selectCircle($event)"
@@ -664,7 +684,8 @@ defineExpose({
       :center="center"
       :zoom="zoom"
       :height="height"
-      :map-style="mapStyleUrl"
+      :map-style="mapStyle"
+      :label="mapAriaLabel"
       :paint-options="paintOptions"
     />
   </div>
@@ -677,8 +698,19 @@ defineExpose({
 }
 .vmr-error-msg {
   font-size: 13px;
-  color: #ef4444;
+  color: var(--vmr-error-color, #dc2626);
   text-align: center;
+}
+.vmr-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 .vmr-zone-loading {
   display: flex;

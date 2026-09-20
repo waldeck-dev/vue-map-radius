@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 
 const props = withDefaults(defineProps<{
   modelValue: number
@@ -16,11 +16,12 @@ const emit = defineEmits<{
   (e: 'blur'): void
 }>()
 
-const msgId = computed(() => {
-  if (props.minMessage) return 'vmr-radius-min-msg'
-  if (props.maxMessage) return 'vmr-radius-max-msg'
-  return undefined
-})
+// Per instance: a hardcoded id collides as soon as a page mounts two maps.
+const uid = useId()
+const fieldId = `${uid}-radius`
+const messageId = `${uid}-radius-message`
+
+const message = computed(() => props.minMessage || props.maxMessage || null)
 
 function onInput(e: Event) {
   const val = parseFloat((e.target as HTMLInputElement).value)
@@ -38,25 +39,26 @@ function onBlur() {
   <div class="vmr-radius-input">
     <label
       class="vmr-radius-label"
-      for="vmr-radius-field"
+      :for="fieldId"
     >{{ label }}</label>
     <input
-      id="vmr-radius-field"
+      :id="fieldId"
       type="number"
       min="0"
       :step="step"
       :value="modelValue"
       class="vmr-radius-field"
-      :aria-describedby="msgId"
+      :aria-describedby="message ? messageId : undefined"
+      :aria-invalid="message ? 'true' : undefined"
       @input="onInput"
       @blur="onBlur"
     >
     <span
-      v-if="msgId"
-      :id="msgId"
+      v-if="message"
+      :id="messageId"
       class="vmr-radius-message"
       role="alert"
-    >{{ minMessage || maxMessage }}</span>
+    >{{ message }}</span>
   </div>
 </template>
 
@@ -80,11 +82,13 @@ function onBlur() {
   box-sizing: border-box;
   outline: none;
 }
-.vmr-radius-field:focus {
-  border-color: var(--vmr-primary-color, #3b82f6);
+.vmr-radius-field:focus-visible {
+  border-color: var(--vmr-primary-color, #2563eb);
+  outline: 2px solid var(--vmr-primary-color, #2563eb);
+  outline-offset: 1px;
 }
 .vmr-radius-message {
   font-size: 12px;
-  color: #ef4444;
+  color: var(--vmr-error-color, #dc2626);
 }
 </style>

@@ -2,7 +2,7 @@ import type { Ref } from 'vue'
 import type { GeoJSON } from 'geojson'
 import type { MapContainerApi, MapCommands } from './useMap'
 import { circleToPolygon, haversineDistance, destinationPoint, bearingTo, hexToRgba } from '../utils/geo'
-import { clampRadius } from '../utils/radius'
+import { clampRadius, formatRadius } from '../utils/radius'
 
 /** Minimum delay between two reactive-state writes while a marker is dragged. */
 const DRAG_THROTTLE_MS = 50
@@ -28,6 +28,10 @@ export interface InteractiveMarkerCallbacks {
   fitBounds?: () => void
 }
 
+/**
+ * Read live on every use, never destructured: the caller passes an object of
+ * getters so a prop change after mount actually reaches the drag handlers.
+ */
 export interface InteractiveMarkerOptions {
   minRadius: number
   maxRadius: number
@@ -35,6 +39,8 @@ export interface InteractiveMarkerOptions {
   draggableCenter: boolean
   draggableRadius: boolean
   showRadiusTooltip: boolean
+  /** BCP 47 tag used to format the drag tooltip. */
+  locale: string
 }
 
 export type { MapContainerApi, MapCommands }
@@ -179,7 +185,7 @@ export function useInteractiveMarkers(
       const clamped = clampRadius(haversineDistance(c.center, pos), opts.minRadius, opts.maxRadius)
       // The tooltip tracks the pointer unthrottled; reactive state does not.
       if (opts.showRadiusTooltip) {
-        getMap()?.setRadiusTooltip(roundToStep(clamped, opts.radiusStep) + ' km', pos)
+        getMap()?.setRadiusTooltip(formatRadius(roundToStep(clamped, opts.radiusStep), opts.locale), pos)
       }
       const now = Date.now()
       if (now - (lastRadiusDragUpdate.get(id) ?? 0) < DRAG_THROTTLE_MS) return

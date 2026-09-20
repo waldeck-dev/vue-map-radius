@@ -83,25 +83,6 @@ export interface MapTilerGeocodingResponse {
   features: MapTilerFeature[]
 }
 
-export interface MapRadiusSearchOptions {
-  placeholder?: string
-  noResultsText?: string
-  loadingText?: string
-}
-
-export interface MapRadiusRadiusOptions {
-  label?: string
-}
-
-export interface MapRadiusModeToggleOptions {
-  radiusLabel?: string
-  polygonLabel?: string
-}
-
-export interface MapRadiusMapOptions {
-  style?: string
-}
-
 export interface MapRadiusGeoOptions {
   coordPrecision?: number
   simplifyTolerance?: number
@@ -133,9 +114,4 @@ export interface MapRadiusInteractiveOptions {
   draggableCenter?: boolean
   draggableRadius?: boolean
   showRadiusTooltip?: boolean
-}
-
-export interface MapRadiusZoneListOptions {
-  removeLabel?: string
-  loadingLabel?: string
 }
