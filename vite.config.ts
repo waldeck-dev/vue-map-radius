@@ -42,5 +42,12 @@ export default defineConfig(({ command }) => ({
   test: {
     environment: 'jsdom',
     globals: true,
+    coverage: {
+      provider: 'v8',
+      // What ships, minus what only exists to be rendered by hand.
+      include: ['src/**/*.{ts,vue}'],
+      exclude: ['src/**/*.test.ts', 'src/types/**', 'src/index.ts', 'src/vite-env.d.ts'],
+      reporter: ['text', 'html'],
+    },
   },
 }))

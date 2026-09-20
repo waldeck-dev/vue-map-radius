@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, shallowRef, watch, computed, nextTick, toRaw } from 'vue'
-import type { Mode, GeocodingResult, MapRadiusState, MapRadiusGeometry, MapRadiusError, MapRadiusZone, MapRadiusCircleZone, MapRadiusInteractiveOptions, MapRadiusGeoOptions, MapRadiusPaintOptions } from '../types'
+import type { Mode, GeocodingResult, MapRadiusState, MapRadiusGeometry, MapRadiusError, MapRadiusZone, MapRadiusCircleZone, MapRadiusDisplayZone, MapRadiusInteractiveOptions, MapRadiusGeoOptions, MapRadiusPaintOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
 import { useGeocoding } from '../composables/useGeocoding'
 import { useGeoJSON } from '../composables/useGeoJSON'
@@ -72,6 +72,48 @@ const emit = defineEmits<{
   (e: 'circle-added', circle: MapRadiusCircleZone): void
   (e: 'circle-removed', id: string): void
   (e: 'circle-selected', id: string | null): void
+}>()
+
+/**
+ * Declared, so replacing a part of the UI is typed: without this every slot
+ * prop reaches the consumer as `any`.
+ */
+defineSlots<{
+  'mode-toggle'(props: {
+    mode: Mode
+    radiusLabel: string
+    polygonLabel: string
+    disabled: boolean
+    switchMode: (mode: Mode) => void
+  }): unknown
+  'search-bar'(props: {
+    query: string
+    placeholder: string
+    results: GeocodingResult[]
+    loading: boolean
+    disabled: boolean
+    updateQuery: (query: string) => void
+    onSelect: (result: GeocodingResult) => void
+  }): unknown
+  'zone-list'(props: {
+    zones: MapRadiusDisplayZone[]
+    removeZone: (id: string) => void
+    removeLabel: string
+    disabled: boolean
+    /** Radius mode only: which circle the radius field is editing. */
+    selectedId: string | null | undefined
+    /** Radius mode only; `undefined` in polygon mode, where nothing is selectable. */
+    selectZone: ((id: string) => void) | undefined
+  }): unknown
+  'radius-input'(props: {
+    radius: number
+    setRadius: (radius: number) => void
+    label: string
+    step: number
+    minMessage: string | undefined
+    maxMessage: string | undefined
+    onBlur: () => void
+  }): unknown
 }>()
 
 function reportError(source: MapRadiusError['source'], message: string, cause?: unknown) {
@@ -203,9 +245,11 @@ const visibleSearchResults = computed(() =>
     : searchResults.value,
 )
 
-const displayZones = computed(() =>
+// Projected down to id/name/colour on purpose: a chip has no use for a
+// country-sized geometry, and handing one to a slot invites a deep render.
+const displayZones = computed<MapRadiusDisplayZone[]>(() =>
   activeMode.value === 'polygon'
-    ? zones.value
+    ? zones.value.map((z) => ({ id: z.id, name: z.name, color: z.color }))
     : circles.value.map((c) => ({ id: c.id, name: c.name || formatRadius(c.radiusKm, props.locale), color: c.color })),
 )
 function removeDisplayZone(id: string) {

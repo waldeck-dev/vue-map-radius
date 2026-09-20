@@ -21,6 +21,13 @@ export interface MapRadiusCircleZone {
   bearing?: number
 }
 
+/** A zone as the chip list shows it: the two modes share this shape. */
+export interface MapRadiusDisplayZone {
+  id: string
+  name: string
+  color?: string
+}
+
 export interface MapRadiusRadiusState {
   mode: 'radius'
   circles: MapRadiusCircleZone[]

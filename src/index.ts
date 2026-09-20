@@ -17,6 +17,7 @@ export type {
   MapRadiusError,
   MapRadiusZone,
   MapRadiusCircleZone,
+  MapRadiusDisplayZone,
   GeocodingResult,
   MapRadiusGeoOptions,
   MapRadiusPaintOptions,
