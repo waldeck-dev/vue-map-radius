@@ -16,7 +16,7 @@ I built this over a weekend because my team needed a map radius/polygon picker �
 - **Round-trippable `v-model`** — what comes out goes back in: store it, reload, and the map rebuilds itself
 - **Accessible** — combobox search, radiogroup mode toggle and selectable chips, all keyboard- and screen-reader-operable
 - **TypeScript** — typed props, emits, slots and exposed methods
-- **Lightweight** — 13.1 kB (JS) + 1.3 kB (CSS) gzipped, on top of MapLibre itself
+- **Lightweight** — 13.5 kB (JS) + 1.3 kB (CSS) gzipped, on top of MapLibre itself (`npm run size`)
 
 ## Installation
 

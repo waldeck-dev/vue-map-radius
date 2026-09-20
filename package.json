@@ -37,7 +37,7 @@
         "prepublishOnly": "npm run build && node scripts/check-package.mjs",
         "test:coverage": "vitest run --coverage",
         "check:package": "node scripts/check-package.mjs",
-        "size": "gzip -c dist/vue-map-radius.js | wc -c && gzip -c dist/vue-map-radius.css | wc -c"
+        "size": "node scripts/size.mjs"
     },
     "peerDependencies": {
         "maplibre-gl": "^5.0.0",
