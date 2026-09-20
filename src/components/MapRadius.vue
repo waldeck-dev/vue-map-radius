@@ -201,9 +201,13 @@ const zoneFeatureCollection = computed<GeoJSON.FeatureCollection>(() => ({
   type: 'FeatureCollection',
   features: zones.value.map(zoneToFeature),
 }))
-const zonesName = computed<string | null>(() =>
-  zones.value.length ? zones.value.map((z) => z.name).join(', ') : null,
-)
+/** A label for the merged shape: every part that still has a name, joined. */
+function joinNames(names: (string | null)[]): string | null {
+  const named = names.filter((n): n is string => !!n)
+  return named.length ? named.join(', ') : null
+}
+const zonesName = computed<string | null>(() => joinNames(zones.value.map((z) => z.name)))
+const circlesName = computed<string | null>(() => joinNames(circles.value.map((c) => c.name)))
 
 const mapContainerRef = ref<InstanceType<typeof MapContainer> | null>(null)
 const errorMsg = ref<string | null>(null)
@@ -391,7 +395,9 @@ function getGeometry(): MapRadiusGeometry {
     const feature = radiusPolygonFeature.value
     return {
       feature: feature ? trimPrecision(feature) as GeoJSON.Feature<GeoJSON.MultiPolygon> : null,
-      name: selectedCircle.value?.name ?? null,
+      // Names every circle in the merge, not just the selected one: the feature
+      // covers all of them.
+      name: circlesName.value,
     }
   }
   return {
@@ -498,7 +504,9 @@ async function onSelect(result: GeocodingResult) {
       }
       emitState()
     } catch (err) {
-      errorMsg.value = err instanceof Error ? err.message : t('error.network')
+      // Through reportError, so a failed detail fetch reaches the `error`
+      // event and not only the inline message.
+      reportError('geocoding-detail', err instanceof Error ? err.message : t('error.network'), err)
     } finally {
       zoneLoading.value = false
     }

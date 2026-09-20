@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { defineComponent, h, nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import MapRadius from './MapRadius.vue'
@@ -182,9 +182,66 @@ describe('MapRadius model round trip', () => {
     const geometry = onGeometry.mock.calls.at(-1)?.[0]
     expect(geometry.feature.geometry.type).toBe('MultiPolygon')
     expect(geometry.feature.geometry.coordinates).toHaveLength(2)
-    expect(geometry.name).toBe('Lyon')
+    // Names the whole merge, not only the selected circle.
+    expect(geometry.name).toBe('Paris, Lyon')
     // and the model itself carries no geometry
     expect(lastEmitted(wrapper)).not.toHaveProperty('polygon')
+  })
+})
+
+describe('MapRadius polygon mode', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  /** One MapTiler detail response, shaped as the geocoder maps it. */
+  function stubDetail(geometry: GeoJSON.Geometry) {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        type: 'FeatureCollection',
+        features: [{
+          id: 'fr', type: 'Feature', place_type: ['country'], text: 'France',
+          place_name: 'France', center: [2.35, 46.2], geometry, properties: {},
+        }],
+      }),
+    })))
+  }
+
+  const square: GeoJSON.Polygon = {
+    type: 'Polygon',
+    coordinates: [[[0, 45], [3, 45], [3, 48], [0, 48], [0, 45]]],
+  }
+
+  async function selectResult(wrapper: Awaited<ReturnType<typeof mountMapRadius>>['wrapper']) {
+    wrapper.findComponent({ name: 'VMPModeToggle' }).vm.$emit('update:mode', 'polygon')
+    await nextTick()
+    wrapper.findComponent({ name: 'VMPSearchBar' }).vm.$emit('select', {
+      id: 'fr', text: 'France', placeName: 'France', center: [2.35, 46.2], type: 'country',
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+  }
+
+  it('adds the fetched zone and draws the merged shape', async () => {
+    stubDetail(square)
+    const { wrapper, api } = await mountMapRadius()
+    await selectResult(wrapper)
+
+    expect(wrapper.emitted('zone-added')?.[0][0]).toMatchObject({ id: 'fr', name: 'France' })
+    const state = lastEmitted(wrapper)
+    expect(state.mode === 'polygon' && state.zones.map((z) => z.id)).toEqual(['fr'])
+    expect(api.updatePolygon).toHaveBeenCalled()
+    expect(api.fitBounds).toHaveBeenCalled()
+  })
+
+  it('reports a failed detail fetch on the error event, not just inline', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 429 })))
+    const { wrapper } = await mountMapRadius()
+    await selectResult(wrapper)
+
+    const error = wrapper.emitted('error')?.at(-1)?.[0] as { source: string; message: string }
+    expect(error.source).toBe('geocoding-detail')
+    expect(error.message).toContain('429')
+    expect(wrapper.find('[role="alert"]').text()).toContain('429')
   })
 })
 
