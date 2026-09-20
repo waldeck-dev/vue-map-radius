@@ -507,6 +507,40 @@ describe('splitOutlyingParts', () => {
     expect(result.outliers).toHaveLength(2)
   })
 
+  /** A lng/lat box, which has a closed-form spherical area to check against. */
+  function box(west: number, south: number, east: number, north: number): GeoJSON.Polygon {
+    return {
+      type: 'Polygon',
+      coordinates: [[[west, south], [east, south], [east, north], [west, north], [west, south]]],
+    }
+  }
+
+  it('measures area the same way at every latitude', () => {
+    // Two boxes of near-identical true area (~247,000 km²), one on the equator
+    // and one across 47-50°N. The old scaled-shoelace area collapsed to almost
+    // nothing right around 49°N, so the northern one read as 4% of the other
+    // and split off as if it were an islet.
+    const geometry = multi(box(0, 0, 10, 2), box(100, 47, 110, 50))
+    expect(splitOutlyingParts(geometry).outliers).toEqual([])
+    expect(splitOutlyingParts(multi(box(100, 47, 110, 50), box(0, 0, 10, 2))).outliers).toEqual([])
+  })
+
+  it('splits a far overseas part off a mid-latitude mainland', () => {
+    // Roughly metropolitan France (~405,000 km²) and French Guiana
+    // (~74,000 km², 18% of it). Both stayed merged while the mainland's area
+    // was computed eight times too small.
+    const mainland = box(0, 44, 8, 50)
+    const overseas = box(-54, 2, -52, 5)
+    const result = splitOutlyingParts(multi(mainland, overseas))
+    expect(result.main).toEqual(mainland)
+    expect(result.outliers).toEqual([overseas])
+
+    // The ratio the split saw is 0.183; bracket it, so an area formula that
+    // drifts by more than ~10% fails here rather than in the field.
+    expect(splitOutlyingParts(multi(mainland, overseas), { sizeRatio: 0.2 }).outliers).toHaveLength(1)
+    expect(splitOutlyingParts(multi(mainland, overseas), { sizeRatio: 0.17 }).outliers).toHaveLength(0)
+  })
+
   it('splits off a far part based on area, not bounding-box diagonal', () => {
     // A naive linear-size comparison would see 4/10 = 40% and keep this merged;
     // by area it's 16/100 = 16%, correctly below the default 25% ratio.

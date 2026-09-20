@@ -135,20 +135,23 @@ interface PolygonPart {
   size: number
 }
 
-// Trapezoid area with the longitude scale taken per edge, at that edge's own
-// latitude: scaling the whole ring by its first vertex's latitude instead makes
-// a part spanning many degrees (Chile, Norway) come out well off.
-// Good enough to compare landmass sizes; not a precise geodesic area.
+/**
+ * Spherical excess (Chamberlain & Duquette), not a scaled planar shoelace.
+ * A shoelace sum only cancels its baseline when every term shares one scale
+ * factor, so folding a per-edge cos(lat) into it makes the result depend on
+ * where the equator is: metropolitan France came out eight times too small,
+ * and its overseas départements then looked too big to split off.
+ */
 function ringAreaKm2(ring: GeoJSON.Position[]): number {
-  const kmPerDegree = 111.32
+  if (ring.length < 4) return 0
+  const toRad = Math.PI / 180
   let sum = 0
   for (let i = 0; i < ring.length - 1; i++) {
     const [lng1, lat1] = ring[i]
     const [lng2, lat2] = ring[i + 1]
-    const midLat = (lat1 + lat2) / 2
-    sum += wrapLongitude(lng2 - lng1) * midLat * Math.cos((midLat * Math.PI) / 180)
+    sum += wrapLongitude(lng2 - lng1) * toRad * (2 + Math.sin(lat1 * toRad) + Math.sin(lat2 * toRad))
   }
-  return Math.abs(sum) * kmPerDegree * kmPerDegree
+  return Math.abs((sum * EARTH_RADIUS_KM * EARTH_RADIUS_KM) / 2)
 }
 
 function polygonAreaKm2(polygon: GeoJSON.Polygon): number {

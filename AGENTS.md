@@ -64,5 +64,5 @@ Contracts worth not regressing:
 
 - `vue` and `maplibre-gl` are external peer dependencies; MapLibre's stylesheet is **not** bundled (consumers import it)
 - `@types/geojson` is a runtime `dependency`, not a devDependency: the published `.d.ts` files reference it
-- `vite-plugin-dts` emits individual `.d.ts` files mirroring `src/` (v5 renamed `rollupTypes` → `bundleTypes`, which needs `@microsoft/api-extractor` and handles Vue SFC types poorly; `cleanVueFileName` + `staticImport` are used instead). Declarations land in `dist/src/`, which is what `exports` points at.
+- `vite-plugin-dts` emits individual `.d.ts` files mirroring `src/` (v5 renamed `rollupTypes` → `bundleTypes`, which needs `@microsoft/api-extractor` and handles Vue SFC types poorly; `cleanVueFileName` + `staticImport` are used instead). `entryRoot` puts them at the root of `dist/`, which is what `exports` points at — `scripts/check-package.mjs` guards that.
 - Entry: `src/index.ts` — component as default, plus types, geo/radius utils and composables
