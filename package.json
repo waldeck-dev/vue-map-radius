@@ -1,10 +1,7 @@
 {
     "name": "vue-map-radius",
     "private": false,
-    "version": "1.1.1",
-    "engines": {
-        "node": ">=22"
-    },
+    "version": "2.0.0",
     "type": "module",
     "description": "A Vue 3 component for radius and polygon visualization on MapTiler maps",
     "files": [
@@ -24,7 +21,8 @@
                 "default": "./dist/vue-map-radius.umd.cjs"
             }
         },
-        "./dist/vue-map-radius.css": "./dist/vue-map-radius.css"
+        "./style.css": "./dist/vue-map-radius.css",
+        "./package.json": "./package.json"
     },
     "scripts": {
         "dev": "vite",
@@ -36,15 +34,16 @@
         "lint": "eslint src/ docs/",
         "lint:fix": "eslint src/ docs/ --fix",
         "typecheck": "vue-tsc --build",
-        "prepublishOnly": "npm run build"
+        "prepublishOnly": "npm run build",
+        "test:coverage": "vitest run --coverage",
+        "size": "gzip -c dist/vue-map-radius.js | wc -c && gzip -c dist/vue-map-radius.css | wc -c"
     },
     "peerDependencies": {
-        "maplibre-gl": "^5.24.0",
-        "vue": "^3.5.34"
+        "maplibre-gl": "^5.0.0",
+        "vue": "^3.5.0"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
-        "@types/geojson": "^7946.0.16",
         "@types/node": "^24.12.3",
         "@vitejs/plugin-vue": "^6.0.6",
         "@vue/language-core": "3.1.8",
@@ -86,5 +85,8 @@
     "bugs": {
         "url": "https://github.com/waldeck-dev/vue-map-radius/issues"
     },
-    "homepage": "https://github.com/waldeck-dev/vue-map-radius#readme"
+    "homepage": "https://github.com/waldeck-dev/vue-map-radius#readme",
+    "dependencies": {
+        "@types/geojson": "^7946.0.16"
+    }
 }

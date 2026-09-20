@@ -1,7 +1,6 @@
 import { ref } from 'vue'
 import type { Ref } from 'vue'
 import maplibregl from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoJSON } from 'geojson'
 import type { MapRadiusPaintOptions } from '../../types'
 

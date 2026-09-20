@@ -16,7 +16,7 @@ I built this over a weekend because my team needed a map radius/polygon picker �
 - **v-model support** — full state management via `MapRadiusState`
 - **TypeScript** — full type definitions included
 - **Geocoding** — powered by MapTiler Geocoding API
-- **Lightweight** — only 8.7 kB (JS) + 10.7 kB (CSS) gzipped
+- **Lightweight** — 11.6 kB (JS) + 1.1 kB (CSS) gzipped, on top of MapLibre itself
 
 ## Installation
 
@@ -24,10 +24,18 @@ I built this over a weekend because my team needed a map radius/polygon picker �
 npm install vue-map-radius
 ```
 
-You also need **vue** and **maplibre-gl** as peer dependencies:
+You also need **vue** (3.5+) and **maplibre-gl** (5+) as peer dependencies:
 
 ```bash
 npm install vue maplibre-gl
+```
+
+MapLibre ships its own stylesheet, and this package does **not** inline it —
+import it once in your app, alongside this package's:
+
+```ts
+import "maplibre-gl/dist/maplibre-gl.css"
+import "vue-map-radius/style.css"
 ```
 
 ## Quick Start
@@ -35,7 +43,8 @@ npm install vue maplibre-gl
 ```vue
 <script setup lang="ts">
 import MapRadius from "vue-map-radius"
-import "vue-map-radius/dist/vue-map-radius.css"
+import "maplibre-gl/dist/maplibre-gl.css"
+import "vue-map-radius/style.css"
 import { ref } from "vue"
 
 const state = ref({

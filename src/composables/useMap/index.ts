@@ -1,7 +1,6 @@
 import { ref, onUnmounted } from 'vue'
 import type { Ref, ShallowUnwrapRef } from 'vue'
 import maplibregl from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMapLayers, buildStyleUrl } from './layers'
 import { useMapMarkers } from './markers'
 import type { MapRadiusPaintOptions } from '../../types'
