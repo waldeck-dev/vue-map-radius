@@ -210,71 +210,115 @@ export function splitOutlyingParts(
   return { main: mainGeometry, outliers }
 }
 
-function trimCoords(value: unknown, decimals: number): unknown {
-  if (typeof value === 'number') {
-    return Number(value.toFixed(decimals))
-  }
-  if (Array.isArray(value)) {
-    return value.map((v) => trimCoords(v, decimals))
-  }
-  if (value !== null && typeof value === 'object') {
-    const result: Record<string, unknown> = {}
-    for (const key of Object.keys(value as Record<string, unknown>)) {
-      result[key] = trimCoords((value as Record<string, unknown>)[key], decimals)
+/** Rounds a position, or any nesting of positions, without touching anything else. */
+function trimPositions(value: unknown, factor: number): unknown {
+  if (!Array.isArray(value)) return value
+  if (typeof value[0] === 'number') {
+    const position = new Array(value.length)
+    for (let i = 0; i < value.length; i++) {
+      position[i] = Math.round((value[i] as number) * factor) / factor
     }
-    return result
+    return position
   }
-  return value
+  return value.map((entry) => trimPositions(entry, factor))
 }
 
+function trimNode(node: Record<string, unknown>, factor: number): Record<string, unknown> {
+  const trimmed: Record<string, unknown> = { ...node }
+  if (Array.isArray(node.bbox)) trimmed.bbox = trimPositions(node.bbox, factor)
+
+  switch (node.type) {
+    case 'FeatureCollection':
+      trimmed.features = (node.features as Record<string, unknown>[]).map((f) => trimNode(f, factor))
+      return trimmed
+    case 'Feature':
+      if (node.geometry) trimmed.geometry = trimNode(node.geometry as Record<string, unknown>, factor)
+      return trimmed
+    case 'GeometryCollection':
+      trimmed.geometries = (node.geometries as Record<string, unknown>[]).map((g) => trimNode(g, factor))
+      return trimmed
+    default:
+      if ('coordinates' in node) trimmed.coordinates = trimPositions(node.coordinates, factor)
+      return trimmed
+  }
+}
+
+/**
+ * Rounds every coordinate to `decimals` places. Walks the GeoJSON structure
+ * rather than cloning it wholesale, so `properties` are left untouched.
+ */
 export function trimCoordPrecision<T extends GeoJSON.GeoJSON | GeoJSON.Geometry | GeoJSON.Feature>(
   geojson: T,
   decimals: number = 6,
 ): T {
-  return trimCoords(geojson, decimals) as T
+  return trimNode(geojson as unknown as Record<string, unknown>, 10 ** decimals) as unknown as T
 }
 
-function perpendicularDistance(
-  p: [number, number],
-  a: [number, number],
-  b: [number, number],
-): number {
-  const dx = b[0] - a[0]
-  const dy = b[1] - a[1]
-  const numerator = Math.abs(dy * p[0] - dx * p[1] + b[0] * a[1] - b[1] * a[0])
-  const denominator = Math.sqrt(dx * dx + dy * dy)
-  if (denominator === 0) {
-    return Math.sqrt((p[0] - a[0]) ** 2 + (p[1] - a[1]) ** 2)
+/**
+ * Marks the points to keep between `lo` and `hi`. Compares squared distances
+ * against a squared tolerance, so the hot loop needs no square root, and walks
+ * index ranges of the original array instead of slicing it at every split.
+ */
+function keepFurthestPoints(
+  points: [number, number][],
+  lo: number,
+  hi: number,
+  toleranceSq: number,
+  keep: Uint8Array,
+): void {
+  if (hi - lo < 2) return
+
+  const ax = points[lo][0]
+  const ay = points[lo][1]
+  const dx = points[hi][0] - ax
+  const dy = points[hi][1] - ay
+  const segmentSq = dx * dx + dy * dy
+  const cross = points[hi][0] * ay - points[hi][1] * ax
+
+  let maxSq = -1
+  let maxIdx = -1
+  for (let i = lo + 1; i < hi; i++) {
+    const px = points[i][0]
+    const py = points[i][1]
+    let distSq
+    if (segmentSq === 0) {
+      const ex = px - ax
+      const ey = py - ay
+      distSq = ex * ex + ey * ey
+    } else {
+      const numerator = dy * px - dx * py + cross
+      distSq = (numerator * numerator) / segmentSq
+    }
+    if (distSq > maxSq) {
+      maxSq = distSq
+      maxIdx = i
+    }
   }
-  return numerator / denominator
+
+  if (maxIdx >= 0 && maxSq > toleranceSq) {
+    keep[maxIdx] = 1
+    keepFurthestPoints(points, lo, maxIdx, toleranceSq, keep)
+    keepFurthestPoints(points, maxIdx, hi, toleranceSq, keep)
+  }
 }
 
 export function ramerDouglasPeucker(
   points: [number, number][],
   tolerance: number,
 ): [number, number][] {
-  if (points.length <= 2) return points
+  const count = points.length
+  if (count <= 2) return points
 
-  let maxDist = 0
-  let maxIdx = 0
-  const first = points[0]
-  const last = points[points.length - 1]
+  const keep = new Uint8Array(count)
+  keep[0] = 1
+  keep[count - 1] = 1
+  keepFurthestPoints(points, 0, count - 1, tolerance < 0 ? -1 : tolerance * tolerance, keep)
 
-  for (let i = 1; i < points.length - 1; i++) {
-    const dist = perpendicularDistance(points[i], first, last)
-    if (dist > maxDist) {
-      maxDist = dist
-      maxIdx = i
-    }
+  const simplified: [number, number][] = []
+  for (let i = 0; i < count; i++) {
+    if (keep[i]) simplified.push(points[i])
   }
-
-  if (maxDist > tolerance) {
-    const left = ramerDouglasPeucker(points.slice(0, maxIdx + 1), tolerance)
-    const right = ramerDouglasPeucker(points.slice(maxIdx), tolerance)
-    return [...left.slice(0, -1), ...right]
-  }
-
-  return [first, last]
+  return simplified
 }
 
 function simplifyRing(

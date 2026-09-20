@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref } from 'vue'
 import { useInteractiveMarkers } from './useInteractiveMarkers'
 import type { MapContainerApi, InteractiveMarkerOptions, InteractiveMarkerCallbacks, RadiusCircleState } from './useInteractiveMarkers'
@@ -70,7 +70,26 @@ describe('useInteractiveMarkers', () => {
     const data = (mapRef.value!.updateCircle as ReturnType<typeof vi.fn>).mock.calls[0][0]
     expect(data.type).toBe('FeatureCollection')
     expect(data.features).toHaveLength(2)
-    expect(mapRef.value!.setVisibility).toHaveBeenCalledWith('radius')
+  })
+
+  it('renderAllCircles does not touch layer visibility (a mode-transition concern)', () => {
+    const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a' })])
+    const mapRef = ref<MapContainerApi | null>(createMockMap())
+    const { renderAllCircles } = useInteractiveMarkers(defaultOpts, circles, ref(null), mapRef, makeCallbacks())
+    renderAllCircles()
+    expect(mapRef.value!.setVisibility).not.toHaveBeenCalled()
+  })
+
+  it('reuses the cached feature for circles that did not change', () => {
+    const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a' }), makeCircle({ id: 'b', center: [1, 1] })])
+    const mapRef = ref<MapContainerApi | null>(createMockMap())
+    const { renderAllCircles } = useInteractiveMarkers(defaultOpts, circles, ref(null), mapRef, makeCallbacks())
+    renderAllCircles()
+    circles.value[1].radiusKm = 25
+    renderAllCircles()
+    const calls = (mapRef.value!.updateCircle as ReturnType<typeof vi.fn>).mock.calls
+    expect(calls[0][0].features[0]).toBe(calls[1][0].features[0])
+    expect(calls[0][0].features[1]).not.toBe(calls[1][0].features[1])
   })
 
   it('updateMarkersForCircle sets a center marker and radius handle for the given id', () => {
@@ -169,5 +188,71 @@ describe('useInteractiveMarkers', () => {
       onRadiusBlur('a')
       removeCircleMarkers('a')
     }).not.toThrow()
+  })
+
+  it('onRadiusBlur clamps, rounds, and fits the camera once', () => {
+    const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a', radiusKm: 12.7 })])
+    const mapRef = ref<MapContainerApi | null>(createMockMap())
+    const cb = makeCallbacks()
+    cb.fitBounds = vi.fn()
+    const { onRadiusBlur } = useInteractiveMarkers(defaultOpts, circles, ref(null), mapRef, cb)
+    onRadiusBlur('a')
+    expect(circles.value[0].radiusKm).toBe(13)
+    expect(cb.fitBounds).toHaveBeenCalledTimes(1)
+    expect(cb.emitState).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('useInteractiveMarkers drag throttling', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function startDrag(circles: ReturnType<typeof ref<RadiusCircleState[]>>, mapRef: ReturnType<typeof ref<MapContainerApi | null>>) {
+    const api = useInteractiveMarkers(defaultOpts, circles as never, ref(null), mapRef as never, makeCallbacks())
+    api.updateMarkersForCircle('a')
+    const centerOpts = (mapRef.value!.setCenterMarker as ReturnType<typeof vi.fn>).mock.calls[0][2]
+    const radiusOpts = (mapRef.value!.setRadiusHandle as ReturnType<typeof vi.fn>).mock.calls[0][2]
+    return { api, centerOpts, radiusOpts }
+  }
+
+  it('radius drag writes reactive state at most once per window, rounded, while the tooltip tracks every tick', () => {
+    const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a', center: [0, 0], radiusKm: 10 })])
+    const mapRef = ref<MapContainerApi | null>(createMockMap())
+    const { radiusOpts } = startDrag(circles, mapRef)
+
+    for (let i = 0; i < 5; i++) {
+      radiusOpts.onDrag([0, 0.5])
+      vi.advanceTimersByTime(10)
+    }
+
+    // 0.5 degrees north of the equator is ~55.66 km: state holds the rounded value
+    expect(circles.value[0].radiusKm).toBe(56)
+    expect(mapRef.value!.setRadiusTooltip).toHaveBeenCalledTimes(5)
+    expect(mapRef.value!.updateCircle).toHaveBeenCalledTimes(1)
+
+    vi.advanceTimersByTime(60)
+    radiusOpts.onDrag([0, 0.5])
+    expect(mapRef.value!.updateCircle).toHaveBeenCalledTimes(2)
+  })
+
+  it('center drag only commits a position on a throttled tick', () => {
+    const circles = ref<RadiusCircleState[]>([makeCircle({ id: 'a', center: [0, 0] })])
+    const mapRef = ref<MapContainerApi | null>(createMockMap())
+    const { centerOpts } = startDrag(circles, mapRef)
+
+    centerOpts.onDrag([1, 1])
+    centerOpts.onDrag([2, 2])
+    centerOpts.onDrag([3, 3])
+
+    expect(circles.value[0].center).toEqual([1, 1])
+    expect(mapRef.value!.updateCircle).toHaveBeenCalledTimes(1)
+
+    centerOpts.onDragEnd([4, 4])
+    expect(circles.value[0].center).toEqual([4, 4])
   })
 })

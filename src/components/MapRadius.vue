@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed, nextTick } from 'vue'
+import { ref, shallowRef, watch, computed, nextTick } from 'vue'
 import type { Ref } from 'vue'
 import type { Mode, GeocodingResult, MapRadiusState, MapRadiusZone, MapRadiusInteractiveOptions, MapRadiusSearchOptions, MapRadiusRadiusOptions, MapRadiusModeToggleOptions, MapRadiusMapOptions, MapRadiusGeoOptions, MapRadiusPaintOptions, MapRadiusZoneListOptions } from '../types'
 import { useTranslation } from '../composables/useTranslation'
@@ -80,7 +80,11 @@ function generateId(): string {
 const activeMode = ref<Mode>(props.mode)
 const searchQuery = ref('')
 const centerPoint = ref<[number, number] | null>(null)
-const zones = ref<MapRadiusZone[]>([])
+// shallowRef, not ref: a country MultiPolygon holds 10^4-10^5 positions, and a
+// deep ref would proxy every one of them — simplification then runs through a
+// Proxy trap per coordinate. Every mutation below replaces the whole array, so
+// identity-based invalidation is enough; do not mutate a zone in place.
+const zones = shallowRef<MapRadiusZone[]>([])
 const circles = ref<RadiusCircleState[]>([])
 const selectedCircleId = ref<string | null>(null)
 const selectedCircle = computed<RadiusCircleState | null>(() =>
@@ -143,6 +147,8 @@ const internalUpdating = ref(false)
 const zoneLoading = ref(false)
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
+/** Identity of the last state we emitted, used to ignore our own v-model echo. */
+let lastEmitted: MapRadiusState | null = null
 
 const draggableCenter = computed(() => props.interactiveOptions?.draggableCenter ?? true)
 const draggableRadius = computed(() => props.interactiveOptions?.draggableRadius ?? true)
@@ -202,20 +208,19 @@ const {
   {
     emitState,
     clearName,
+    fitBounds: fitAllCirclesBounds,
   },
 )
 
 const selectedRadiusKm = computed<number>({
   get: () => selectedCircle.value?.radiusKm ?? 0,
+  // Typing is provisional: redraw the ring so the field feels live, but leave
+  // the camera and the markers alone until blur commits the value.
   set: (value) => {
     const c = selectedCircle.value
     if (!c) return
     c.radiusKm = value
     renderAllCircles()
-    fitAllCirclesBounds()
-    if (draggableRadius.value) {
-      nextTick(() => updateMarkersForCircle(c.id))
-    }
   },
 })
 
@@ -300,15 +305,20 @@ function emitState() {
       : [],
     bearing: activeMode.value === 'radius' ? selectedCircle.value?.bearing : undefined,
   }
+  lastEmitted = state
   emit('update:modelValue', state)
 }
 
 watch(() => props.modelValue, (val) => {
   if (!val) return
+  // A v-model parent hands our own object straight back. Re-hydrating from it
+  // would tear down and rebuild every marker and refit the camera on every
+  // drag end, so ignore the echo and only react to state we did not produce.
+  if (val === lastEmitted) return
   internalUpdating.value = true
   hydrate(val)
   nextTick(() => { internalUpdating.value = false })
-}, { deep: true, immediate: true })
+}, { immediate: true })
 
 watch(() => mapContainerRef.value?.mapReady, (ready) => {
   if (ready && props.modelValue) {
@@ -334,6 +344,7 @@ async function onSelect(result: GeocodingResult) {
     selectedCircleId.value = newCircle.id
     searchQuery.value = ''
     renderCircle(newCircle.id)
+    mapContainerRef.value?.setVisibility('radius')
     updateMarkersForCircle(newCircle.id)
     fitAllCirclesBounds()
     emitState()
@@ -417,6 +428,7 @@ function renderCurrentState() {
   if (activeMode.value === 'radius') {
     if (circles.value.length > 0) {
       renderAllCircles()
+      mapContainerRef.value?.setVisibility('radius')
       updateAllMarkers()
       fitAllCirclesBounds()
     }
@@ -439,6 +451,7 @@ watch(activeMode, (mode) => {
   if (mode === 'radius') {
     zones.value = []
     mapContainerRef.value?.clearPolygon()
+    mapContainerRef.value?.setVisibility('radius')
     if (circles.value.length > 0) {
       renderAllCircles()
       updateAllMarkers()
