@@ -371,9 +371,9 @@ export function destinationPoint(
   return [(newLngRad * 180) / Math.PI, (newLatRad * 180) / Math.PI]
 }
 
-const polygonBoundsCache = new WeakMap<GeoJSON.Feature, [number, number, number, number]>()
+const polygonBoundsCache = new WeakMap<GeoJSON.Feature<GeoJSON.Geometry | null>, [number, number, number, number]>()
 
-export function getPolygonBounds(feature: GeoJSON.Feature): [number, number, number, number] | null {
+export function getPolygonBounds(feature: GeoJSON.Feature<GeoJSON.Geometry | null>): [number, number, number, number] | null {
   const cached = polygonBoundsCache.get(feature)
   if (cached) return cached
   if (!feature.geometry) return null

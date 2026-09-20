@@ -214,16 +214,16 @@ describe('haversineDistance', () => {
   })
 
   it('computes known distance Paris-London', () => {
-    const paris = [2.35, 48.85]
-    const london = [-0.12, 51.5]
+    const paris: [number, number] = [2.35, 48.85]
+    const london: [number, number] = [-0.12, 51.5]
     const dist = haversineDistance(paris, london)
     expect(dist).toBeGreaterThan(330)
     expect(dist).toBeLessThan(360)
   })
 
   it('is commutative', () => {
-    const a = [10, 20]
-    const b = [30, 40]
+    const a: [number, number] = [10, 20]
+    const b: [number, number] = [30, 40]
     expect(haversineDistance(a, b)).toBeCloseTo(haversineDistance(b, a), 6)
   })
 })
@@ -248,7 +248,7 @@ describe('destinationPoint', () => {
   })
 
   it('is round-trip consistent with haversineDistance', () => {
-    const origin = [10, 30]
+    const origin: [number, number] = [10, 30]
     const dist = 500
     const dest = destinationPoint(origin, dist, 45)
     const roundTrip = haversineDistance(origin, dest)
@@ -258,7 +258,7 @@ describe('destinationPoint', () => {
 
 describe('getPolygonBounds', () => {
   it('returns null for null geometry', () => {
-    const feature: GeoJSON.Feature = { type: 'Feature', properties: {}, geometry: null }
+    const feature: GeoJSON.Feature<GeoJSON.Geometry | null> = { type: 'Feature', properties: {}, geometry: null }
     expect(getPolygonBounds(feature)).toBeNull()
   })
 

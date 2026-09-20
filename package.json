@@ -35,7 +35,7 @@
         "test:watch": "vitest",
         "lint": "eslint src/ docs/",
         "lint:fix": "eslint src/ docs/ --fix",
-        "typecheck": "vue-tsc --noEmit",
+        "typecheck": "vue-tsc --build",
         "prepublishOnly": "npm run build"
     },
     "peerDependencies": {
