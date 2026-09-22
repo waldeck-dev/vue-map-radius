@@ -16,7 +16,7 @@ I built this over a weekend because my team needed a map radius/polygon picker �
 - **Round-trippable `v-model`** — what comes out goes back in: store it, reload, and the map rebuilds itself
 - **Accessible** — combobox search, radiogroup mode toggle and selectable chips, all keyboard- and screen-reader-operable
 - **TypeScript** — typed props, emits, slots and exposed methods
-- **Lightweight** — 13.5 kB (JS) + 1.3 kB (CSS) gzipped, on top of MapLibre itself (`npm run size`)
+- **Lightweight** — 13.4 kB (JS) + 1.3 kB (CSS) gzipped, on top of MapLibre itself (`npm run size`)
 
 ## Installation
 
@@ -24,7 +24,7 @@ I built this over a weekend because my team needed a map radius/polygon picker �
 npm install vue-map-radius
 ```
 
-You also need **vue** (3.5+) and **maplibre-gl** (5+) as peer dependencies:
+You also need **vue** (3.5+) and **maplibre-gl** (6+) as peer dependencies:
 
 ```bash
 npm install vue maplibre-gl
@@ -234,6 +234,26 @@ The package's default export is the component. Alongside it:
 
 ## Migrating from v1
 
+> [!WARNING]
+> **Do not use 2.0.0 — it is deprecated.** It pins `maplibre-gl@^5`, and every MapLibre 5
+> release carries an unpatched critical XSS in `DOM.sanitize()`
+> ([GHSA-jrc7-96c5-q579](https://github.com/advisories/GHSA-jrc7-96c5-q579)); the fix only
+> exists in MapLibre 6. Upgrade to **2.1.0**, which requires `maplibre-gl@^6`. It is a
+> minor release on purpose: a caret range `^2.0.0` picks it up on the next install, which
+> is the point. Coming from 2.0.0, the two bullets marked *(2.1.0)* below are the whole
+> migration — props, emits, slots, exposed methods and the `v-model` shape are unchanged.
+
+- **MapLibre 6 is required** *(2.1.0)*. The peer range is now `maplibre-gl@^6`; MapLibre 5
+  has an unpatched XSS in `DOM.sanitize()`, and no 5.x release fixes it. Run
+  `npm install maplibre-gl@^6`. MapLibre 6's own
+  [migration notes](https://github.com/maplibre/maplibre-gl-js/releases) apply to your own
+  map code.
+- **The package is ESM only** *(2.1.0)*. MapLibre 6 ships no UMD or CJS build, so the
+  `dist/vue-map-radius.umd.cjs` bundle — which externalised a `maplibregl` global that
+  no longer exists — is gone, along with the `main` field and the `require` export
+  condition. `import` is unchanged. `require()` still resolves, but to the ESM build, so
+  it needs Node 22.12+ (or a bundler that handles `require` of ESM); MapLibre 6 itself
+  carries the same requirement.
 - **State is a discriminated union.** `center` / `radiusKm` / `name` / `bearing` at the top level are gone; read `state.circles` in radius mode and `state.zones` in polygon mode.
 - **Geometry left the model.** `state.polygon` is gone — listen to `@geometry` or call `getGeometry()`.
 - **Radius mode holds many circles.** Selecting a search result adds one instead of moving the only one.

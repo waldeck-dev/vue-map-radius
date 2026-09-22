@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
 import type { Ref } from 'vue'
-import maplibregl from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
 
 const mockMap = vi.hoisted(() => ({
   on: vi.fn(),
@@ -18,22 +18,20 @@ const mockMap = vi.hoisted(() => ({
 const mockMarkerInstances = vi.hoisted(() => [] as any[])
 
 vi.mock('maplibre-gl', () => ({
-  default: {
-    Map: vi.fn(function () { return mockMap }),
-    Marker: vi.fn(function () {
-      const m = {
-        setLngLat: vi.fn().mockReturnThis(),
-        addTo: vi.fn().mockReturnThis(),
-        on: vi.fn(),
-        getLngLat: vi.fn(() => ({ lng: 0, lat: 0 })),
-        remove: vi.fn(),
-        getElement: vi.fn(() => document.createElement('div')),
-        setOffset: vi.fn().mockReturnThis(),
-      }
-      mockMarkerInstances.push(m)
-      return m
-    }),
-  }
+  Map: vi.fn(function () { return mockMap }),
+  Marker: vi.fn(function () {
+    const m = {
+      setLngLat: vi.fn().mockReturnThis(),
+      addTo: vi.fn().mockReturnThis(),
+      on: vi.fn(),
+      getLngLat: vi.fn(() => ({ lng: 0, lat: 0 })),
+      remove: vi.fn(),
+      getElement: vi.fn(() => document.createElement('div')),
+      setOffset: vi.fn().mockReturnThis(),
+    }
+    mockMarkerInstances.push(m)
+    return m
+  }),
 }))
 
 import { buildStyleUrl } from './useMap'

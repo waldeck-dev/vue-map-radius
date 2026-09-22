@@ -73,6 +73,10 @@ Contracts worth not regressing:
 - Conventional Commits style (feat:, fix:, refactor:, chore:, etc.); a `!` marks a breaking change
 - **Every change lands through a branch and a pull request — never a direct commit on `main`.** Branch first (`fix/…`, `feat/…`, `docs/…`), push, open the PR (`gh pr create`), wait for CI to go green, then merge. History before 43ac85a predates this rule and is direct-to-`main`; do not take it as the convention.
 - Publishing is manual: bump `version`, then `npm publish` runs `prepublishOnly` (build + `check-package.mjs`)
+- **2.0.0 is deprecated on the registry** — it pins `maplibre-gl@^5`, whose every release carries an unpatched critical XSS ([GHSA-jrc7-96c5-q579](https://github.com/advisories/GHSA-jrc7-96c5-q579)). 2.1.0 moves the peer range to `^6` and is numbered a *minor* on purpose, against semver: a breaking peer bump inside `^2.0.0` is what pulls existing installs off the vulnerable version automatically. The README carries the same warning; keep the two in step. Mark it with:
+  ```
+  npm deprecate vue-map-radius@2.0.0 "Requires the vulnerable maplibre-gl@^5 (GHSA-jrc7-96c5-q579); upgrade to 2.1.0, which requires maplibre-gl@^6"
+  ```
 - `.gitignore` lists `SPEC.md`, `TODO.md`, `opencode.json` — local-only, NOT committed
 - Only `dist/` is published (via `"files": ["dist"]`)
 
@@ -86,6 +90,7 @@ Contracts worth not regressing:
 ## Bundle
 
 - `vue` and `maplibre-gl` are external peer dependencies; MapLibre's stylesheet is **not** bundled (consumers import it)
+- **ESM only** (`build.lib.formats: ['es']`). MapLibre 6 ships no UMD or CJS build, so a UMD bundle of ours would externalise a `maplibregl` global that cannot exist; `main` and the `require` export condition went with it in 2.1.0. Do not re-add a UMD format without a global to point it at.
 - `@types/geojson` is a runtime `dependency`, not a devDependency: the published `.d.ts` files reference it
 - `vite-plugin-dts` emits individual `.d.ts` files mirroring `src/` (v5 renamed `rollupTypes` → `bundleTypes`, which needs `@microsoft/api-extractor` and handles Vue SFC types poorly; `cleanVueFileName` + `staticImport` are used instead). `entryRoot` puts them at the root of `dist/`, which is what `exports` points at — `scripts/check-package.mjs` guards that.
 - Entry: `src/index.ts` — component as default, plus types, geo/radius utils and composables

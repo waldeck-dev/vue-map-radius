@@ -25,18 +25,13 @@ export default defineConfig(({ command }) => ({
     sourcemap: true,
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
-      name: 'VueMapRadius',
+      // ESM only: maplibre-gl 6 ships no UMD or CJS build, so a UMD bundle of
+      // ours would externalise a `maplibregl` global that cannot exist.
+      formats: ['es'],
       fileName: 'vue-map-radius',
     },
     rollupOptions: {
       external: ['vue', 'maplibre-gl'],
-      output: {
-        exports: 'named',
-        globals: {
-          vue: 'Vue',
-          'maplibre-gl': 'maplibregl',
-        },
-      },
     },
   },
   test: {

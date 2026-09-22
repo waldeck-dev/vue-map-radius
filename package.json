@@ -1,25 +1,18 @@
 {
     "name": "vue-map-radius",
     "private": false,
-    "version": "2.0.0",
+    "version": "2.1.0",
     "type": "module",
     "description": "A Vue 3 component for radius and polygon visualization on MapTiler maps",
     "files": [
         "dist"
     ],
-    "main": "./dist/vue-map-radius.umd.cjs",
     "module": "./dist/vue-map-radius.js",
     "types": "./dist/index.d.ts",
     "exports": {
         ".": {
-            "import": {
-                "types": "./dist/index.d.ts",
-                "default": "./dist/vue-map-radius.js"
-            },
-            "require": {
-                "types": "./dist/index.d.ts",
-                "default": "./dist/vue-map-radius.umd.cjs"
-            }
+            "types": "./dist/index.d.ts",
+            "default": "./dist/vue-map-radius.js"
         },
         "./style.css": "./dist/vue-map-radius.css",
         "./package.json": "./package.json"
@@ -40,7 +33,7 @@
         "size": "node scripts/size.mjs"
     },
     "peerDependencies": {
-        "maplibre-gl": "^5.0.0",
+        "maplibre-gl": "^6.0.0",
         "vue": "^3.5.0"
     },
     "devDependencies": {
@@ -55,7 +48,7 @@
         "eslint-plugin-vue": "^10.9.2",
         "globals": "^17.6.0",
         "jsdom": "^29.1.1",
-        "maplibre-gl": "^5.24.0",
+        "maplibre-gl": "^6.10.0",
         "typescript": "~6.0.2",
         "typescript-eslint": "^8.60.1",
         "vite": "^8.0.12",
