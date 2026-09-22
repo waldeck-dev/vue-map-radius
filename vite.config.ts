@@ -21,6 +21,13 @@ export default defineConfig(({ command }) => ({
       '@': resolve(__dirname, 'src'),
     },
   },
+  // MapLibre 6 resolves its worker relative to its own `import.meta.url`.
+  // Pre-bundling moves that URL into node_modules/.vite/deps/, where the worker
+  // is not, so the dev server 404s it and the map paints nothing. Excluding it
+  // is dev-only: the docs build relies on setWorkerUrl() in docs/main.ts.
+  optimizeDeps: {
+    exclude: ['maplibre-gl'],
+  },
   build: {
     sourcemap: true,
     lib: {

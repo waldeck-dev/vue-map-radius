@@ -38,6 +38,39 @@ import "maplibre-gl/dist/maplibre-gl.css"
 import "vue-map-radius/style.css"
 ```
 
+### Point MapLibre at its worker
+
+MapLibre 6 locates its web worker through its own `import.meta.url`, which no
+bundler resolves to the real file, so **every app calls `setWorkerUrl()` once**
+at startup — without it the map paints its background colour and no tile ever
+appears. This is MapLibre's requirement, not this package's; see its
+[installation guide](https://maplibre.org/maplibre-gl-js/docs/) for the other
+bundlers. With Vite:
+
+```ts
+// main.ts
+import { setWorkerUrl } from "maplibre-gl"
+import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"
+
+setWorkerUrl(workerUrl)
+```
+
+`?worker&url`, not a bare `?url`: the worker imports a sibling
+`maplibre-gl-shared.mjs` that `?url` does not emit, and tiles then fail to parse
+in production only. Vite's dev server also needs MapLibre kept out of its
+dependency pre-bundler, which moves that `import.meta.url` somewhere the worker
+is not:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  optimizeDeps: { exclude: ["maplibre-gl"] },
+})
+```
+
+`docs/main.ts` and `vite.config.ts` in this repo do exactly this, if you want a
+working reference.
+
 ## Quick start
 
 ```vue
@@ -245,9 +278,13 @@ The package's default export is the component. Alongside it:
 
 - **MapLibre 6 is required** *(2.1.0)*. The peer range is now `maplibre-gl@^6`; MapLibre 5
   has an unpatched XSS in `DOM.sanitize()`, and no 5.x release fixes it. Run
-  `npm install maplibre-gl@^6`. MapLibre 6's own
-  [migration notes](https://github.com/maplibre/maplibre-gl-js/releases) apply to your own
-  map code.
+  `npm install maplibre-gl@^6`.
+- **You must call `setWorkerUrl()`** *(2.1.0)*. New in MapLibre 6 and easy to miss: skip it
+  and the map renders blank with no error. See
+  [Point MapLibre at its worker](#point-maplibre-at-its-worker).
+- **MapLibre 6 requires WebGL2** *(2.1.0)*, having dropped WebGL1. Its
+  [v5→v6 migration guide](https://maplibre.org/maplibre-gl-js/docs/guides/v5-to-v6-migration-guide/)
+  covers the rest, which applies to your own map code rather than to this component.
 - **The package is ESM only** *(2.1.0)*. MapLibre 6 ships no UMD or CJS build, so the
   `dist/vue-map-radius.umd.cjs` bundle — which externalised a `maplibregl` global that
   no longer exists — is gone, along with the `main` field and the `require` export
