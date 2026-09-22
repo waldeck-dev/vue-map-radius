@@ -261,6 +261,22 @@ describe('MapRadius selection and mode', () => {
     expect(selected).toMatchObject({ name: 'Lyon', center: [4.83, 45.76], radiusKm: 30 })
   })
 
+  it('redraws the circle source after removing one of several circles', async () => {
+    // The markers were removed but the fill/outline source, built from the
+    // whole collection, was left holding the deleted disc.
+    const { wrapper, api } = await mountMapRadius(radiusState([
+      { id: 'a', name: 'Paris', center: [2.35, 48.85], radiusKm: 20, color: '#3b82f6' },
+      { id: 'b', name: 'Lyon', center: [4.83, 45.76], radiusKm: 30, color: '#ef4444' },
+    ]))
+    api.updateCircle.mockClear()
+
+    wrapper.findComponent({ name: 'VMPZoneList' }).vm.$emit('remove', 'b')
+    await nextTick()
+
+    const collection = api.updateCircle.mock.calls.at(-1)?.[0]
+    expect(collection.features.map((f: GeoJSON.Feature) => f.properties?.id)).toEqual(['a'])
+  })
+
   it('tears the radius mode down once when switching to polygon, and emits once', async () => {
     const { wrapper, api } = await mountMapRadius(radiusState([
       { id: 'a', name: 'Paris', center: [2.35, 48.85], radiusKm: 20, color: '#3b82f6' },

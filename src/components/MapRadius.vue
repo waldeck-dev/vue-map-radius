@@ -534,9 +534,11 @@ function removeCircleZone(id: string) {
   circles.value = circles.value.filter((c) => c.id !== id)
   removeCircleMarkers(id)
   errorMsg.value = null
+  // The markers are gone, but the fill/outline live in a single GeoJSON source
+  // built from the whole collection: without this the removed disc stays drawn.
+  renderAllCircles()
   if (circles.value.length === 0) {
     selectedCircleId.value = null
-    mapContainerRef.value?.clearCircle()
   } else {
     const nextIndex = Math.min(removedIndex, circles.value.length - 1)
     selectedCircleId.value = circles.value[nextIndex]?.id ?? null
