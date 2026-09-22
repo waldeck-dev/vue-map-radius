@@ -6,7 +6,7 @@ A Vue 3 component for drawing radius circles and administrative polygons on [Map
 
 ## Motivations
 
-I built this over a weekend because my team needed a map radius/polygon picker — a low-priority feature that kept getting deprioritised. It was also a chance to try out two things I’d been curious about: **vibe coding** (letting an AI assistant drive most of the implementation) and [**OpenCode**](https://opencode.ai/docs/en/) with the **Big Pickle** model as the engine behind it. The result is a real, shippable component that solved the original need and doubled as a fun experiment in AI-assisted development.
+I built this over a weekend because my team needed a map radius/polygon picker — a low-priority feature that kept getting deprioritised. It was also a chance to try out **vibe coding**: letting an AI assistant drive most of the implementation. v1 was written with [**OpenCode**](https://opencode.ai/docs/en/) running the **Big Pickle** model; v2 — the multi-circle rewrite — with [**Claude Code**](https://claude.com/claude-code) on **Opus**. The result is a real, shippable component that solved the original need and doubled as a fun experiment in AI-assisted development.
 
 ## Features
 
